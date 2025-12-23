@@ -201,5 +201,5 @@ if __name__ == '__main__':
     parser = add_cmd_args(parser)
     args = parser.parse_args()
     args.cnmf_components = range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2])
-    logger.splash(args)
+    log.splash(args)
     main(args)

@@ -16,7 +16,7 @@ proj = project()
 from _utils.slurm import array_submitter, add_slurm_args_dec
 
 def main(args):
-    submitter = array_submitter(name = 'gene_programmes_batch' + '_'.join(args.datasets),
+    submitter = array_submitter(name = 'gene_programmes_batch_' + '_'.join(args.datasets),
         partition = 'sapphire', n_cpu = 16, timeout = 240)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
