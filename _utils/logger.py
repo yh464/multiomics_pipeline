@@ -40,14 +40,19 @@ class logger():
         self.file = open(fname, 'w') if fname is not None else sys.stdout
         self.echo = echo
         
-    def log(self, msg, warning = False):
+    def log(self, msg, warning = False, calling_file = None):
         now = datetime.datetime.now().isoformat(sep = ' ')
-        calling_file = os.path.basename(inspect.stack()[1].filename).replace('.py','')
+        if calling_file is None:
+            calling_file = os.path.basename(inspect.stack()[1].filename).replace('.py','')
         warning_str = '| WARNING ' if warning else ''
         msg = f'[ {now} | {calling_file} {warning_str}] {msg}'
         print(msg, file = self.file)
         if self.echo and self.file != sys.stdout: print(msg)
     
+    def warn(self, msg, calling_file = None):
+        self.log(msg, warning = True, calling_file = calling_file)
+    
     def splash(self, args):
         msg = splash(args, silent = True)
-        self.log(msg)
+        print(msg, file = self.file)
+        if self.echo and self.file != sys.stdout: print(msg)

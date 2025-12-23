@@ -55,7 +55,7 @@ class array_submitter():
                  arraysize = 200, # array size limit, default 2000 for CSD3 cluster, QOS max jobs 500
                  email = True,
                  wallclock = -1, # total time limit per file, default 240 minutes
-                 env = 'wd', # default working environment
+                 env = 'gentoolspy', # default working environment
                  modules = [], # modules to load
                  dependency = [], # dependent jobs
                  account = None,
@@ -382,29 +382,37 @@ class array_submitter():
         self._submit_single()
         self._staged_cmd = []
 
+def add_slurm_args(parser: argparse.ArgumentParser):
+    slurm = parser.add_argument_group('SLURM configuration, enter numbers to override default resource allocation,\n'+
+        'enter x2, etc. to multiply the default values, leave blank to use defaults')
+    slurm.add_argument('--jobname', help = 'Manually specify job name')
+    slurm.add_argument('--partition', help = 'partition')
+    slurm.add_argument('--account', help = 'account to charge')
+    slurm.add_argument('--n_cpu', help = 'number of CPUs per task')
+    slurm.add_argument('--n_gpu', help = 'number of GPUs per task')
+    slurm.add_argument('--n_node', help = 'number of nodes needed')
+    slurm.add_argument('--n_task', help = 'number of tasks per job')
+    slurm.add_argument('--arraysize', help = 'number of files per array job')
+    slurm.add_argument('--timeout', help = 'timeout in minutes')
+    slurm.add_argument('--wallclock', help = 'total time limit per file in minutes')
+    slurm.add_argument('--parallel', help = 'number of parallel processes')
+    slurm.add_argument('--debug', help = 'debug mode', default = False, action = 'store_true')
+    slurm.add_argument('--dep', help = 'dependencies', default = [], nargs = '*')
+    slurm.add_argument('--intr', help = 'interactive mode', default = False, action = 'store_true')
+    return parser
+
+def add_slurm_args_dec(generator):
+    def wrapper(*args, **kwargs):
+        parser = generator(*args, **kwargs)
+        parser = add_slurm_args(parser)
+        return parser
+    return wrapper
+
 class slurm_parser(argparse.ArgumentParser):
-    '''
-    An argparse.ArgumentParser with default SLURM config options
-    '''
+    '''An argparse.ArgumentParser with default SLURM config options'''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.parser_config()
 
     def parser_config(self):
-        slurm = self.add_argument_group('SLURM configuration, enter numbers to override default resource allocation,\n'+
-            'enter x2, etc. to multiply the default values, leave blank to use defaults')
-        slurm.add_argument('--jobname', help = 'Manually specify job name')
-        slurm.add_argument('--partition', help = 'partition')
-        slurm.add_argument('--account', help = 'account to charge')
-        slurm.add_argument('--n_cpu', help = 'number of CPUs per task')
-        slurm.add_argument('--n_gpu', help = 'number of GPUs per task')
-        slurm.add_argument('--n_node', help = 'number of nodes needed')
-        slurm.add_argument('--n_task', help = 'number of tasks per job')
-        slurm.add_argument('--arraysize', help = 'number of files per array job')
-        slurm.add_argument('--timeout', help = 'timeout in minutes')
-        slurm.add_argument('--wallclock', help = 'total time limit per file in minutes')
-        slurm.add_argument('--parallel', help = 'number of parallel processes')
-        slurm.add_argument('--debug', help = 'debug mode', default = False, action = 'store_true')
-        slurm.add_argument('--dep', help = 'dependencies', default = [], nargs = '*')
-        slurm.add_argument('--intr', help = 'interactive mode', default = False, action = 'store_true')
-        
+        self = add_slurm_args(self)
