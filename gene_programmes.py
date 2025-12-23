@@ -29,7 +29,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 121, 10), seed = 
     '''
 
     h5ad_raw = proj.to_pathname('raw', dataset, prefix)[0]
-    outdir = os.path.realpath(outdir).replace('%dataset%', dataset).replace('%prefix%', prefix)
+    outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
 
     import cnmf
     prefix = os.path.basename(h5ad_raw).replace('.h5ad','')
@@ -58,7 +58,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     '''
     h5ad_raw = proj.to_pathname('raw', dataset, prefix)[0]
     adata = sc.read_h5ad(h5ad_raw)
-    outdir = os.path.realpath(outdir).replace('%dataset%', dataset).replace('%prefix%', prefix)
+    outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
     
     # output files for progress checking
     os.makedirs(outdir, exist_ok = True)
@@ -169,8 +169,8 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     plt.close(fig)
 
 def main(args):
-    cnmf_outdir = os.path.dirname(proj.config['programmes_cnmf']).replace('%dataset%', args.dataset).replace('%prefix%', args.prefix)
-    scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('%dataset%', args.dataset).replace('%prefix%', args.prefix)
+    cnmf_outdir = os.path.dirname(proj.config['programmes_cnmf']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
+    scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, force = args.force)
     if args.scired:

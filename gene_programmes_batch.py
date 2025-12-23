@@ -20,11 +20,11 @@ def main(args):
         partition = 'sapphire', n_cpu = 16, timeout = 240)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
-    cnmf_outdir = os.path.realpath('../programmes/cnmf/%dataset%/%prefix%')
-    proj.register('programmes_cnmf',f'{cnmf_outdir}/%prefix%.usages.k_*.dt_*.consensus.txt')
-    scired_outdir = os.path.realpath('../programmes/scired/%dataset%/%prefix%')
-    proj.register('programmes_scired',f'{scired_outdir}/%prefix%_scired_loadings.txt')
-    proj.register('programmes_scired_scores',f'{scired_outdir}/%prefix%_scired_scores.txt')
+    cnmf_outdir = os.path.realpath('../programmes/cnmf/$dataset/$prefix')
+    proj.register('programmes_cnmf',f'{cnmf_outdir}/$prefix.usages.k_*.dt_*.consensus.txt')
+    scired_outdir = os.path.realpath('../programmes/scired/$dataset/$prefix')
+    proj.register('programmes_scired',f'{scired_outdir}/$prefix_scired_loadings.txt')
+    proj.register('programmes_scired_scores',f'{scired_outdir}/$prefix_scired_scores.txt')
     cnmf_components_str = ' '.join([str(x) for x in args.cnmf_components])
 
     for dataset, prefix in h5ad:

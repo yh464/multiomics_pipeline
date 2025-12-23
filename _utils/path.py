@@ -23,8 +23,8 @@ class project():
         self.config_file = f'{self.project_root}/.path/path_config.json'
         if not os.path.isfile(self.config_file):
             self.config = {
-                'raw': f'{self.project_root}/raw/%dataset%/%prefix%.h5ad', # raw data directory will be scanned
-                'normalised': f'{self.project_root}/normalised/%dataset%/%prefix%.h5ad', # normalised data will also be scanned
+                'raw': f'{self.project_root}/raw/$dataset/$prefix.h5ad', # raw data directory will be scanned
+                'normalised': f'{self.project_root}/normalised/$dataset/$prefix.h5ad', # normalised data will also be scanned
             }
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent = 4)
@@ -49,7 +49,7 @@ class project():
 
     def scan_h5ad(self): # special function to scan for original and normalised h5ad files
         raw_list = []
-        raw_pattern = self.config['raw'].replace('%dataset%','*').replace('%prefix%','*.h5ad')
+        raw_pattern = self.config['raw'].replace('$dataset','*').replace('$prefix','*.h5ad')
         for root, _, files in os.walk(f'{self.project_root}/raw'):
             for file in files:
                 full_path = os.path.join(root, file)
@@ -57,7 +57,7 @@ class project():
                     raw_list.append((os.path.basename(root), file)) # (dataset, prefix) tuple
 
         norm_list = []
-        norm_pattern = self.config['normalised'].replace('%dataset%','*').replace('%prefix%','*.h5ad')
+        norm_pattern = self.config['normalised'].replace('$dataset','*').replace('$prefix','*.h5ad')
         for root, _, files in os.walk(f'{self.project_root}/normalised'):
             for file in files:
                 full_path = os.path.join(root, file)
@@ -77,7 +77,7 @@ class project():
         other_files.remove('raw'); other_files.remove('normalised')
         for dataset, prefix in out_df.index:
             for ftype in other_files:
-                pattern = self.config[ftype].replace('%dataset%', dataset).replace('%prefix%', prefix)
+                pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
                 if os.path.isfile(pattern):
                     out_df.loc[(dataset, prefix), ftype] = True
                 elif any([fnmatch(file, pattern) for file in os.listdir(os.path.dirname(pattern))]): # in case path contains wildcards
@@ -135,7 +135,7 @@ class project():
         for dataset, prefix in datasets:
             if ftype not in self.config:
                 raise ValueError(f'File type {ftype} not found in path config')
-            pattern = self.config[ftype].replace('%dataset%', dataset).replace('%prefix%', prefix)
+            pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
             out.append(os.path.isfile(pattern))
             self.progress.loc[(dataset, prefix), ftype] = out[-1]
         log.log(f'Found {sum(out)} / {len(out)} files for processing step {ftype}', calling_file = 'path/find')
@@ -151,7 +151,7 @@ class project():
         for dataset, prefix in datasets:
             if ftype not in self.config:
                 raise ValueError(f'File type {ftype} not found in path config')
-            pattern = self.config[ftype].replace('%dataset%', dataset).replace('%prefix%', prefix)
+            pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
             out.append(pattern)
         return out
 
@@ -159,8 +159,8 @@ class project():
         pattern = os.path.realpath(pattern)
         if ftype in self.config and pattern != self.config[ftype] and not force:
             raise ValueError(f'File type {ftype} already exists in path config. Use force = True to overwrite.')
-        if '%dataset%' not in pattern or '%prefix%' not in pattern:
-            raise ValueError('Pattern must contain %dataset% and %prefix% placeholders.')
+        if '$dataset' not in pattern or '$prefix' not in pattern:
+            raise ValueError('Pattern must contain $dataset and $prefix placeholders.')
         self.config[ftype] = pattern
         self.progress[ftype] = False
         self.save()
