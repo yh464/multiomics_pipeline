@@ -35,7 +35,7 @@ class project():
         self.progress_file = f'{self.project_root}/.path/progress.txt'
         if not os.path.isfile(self.progress_file):
             self.progress = self.scan_h5ad()
-            other_files = self.config.keys()
+            other_files = list(self.config.keys())
             other_files.remove('raw'); other_files.remove('normalised')
             self.progress[other_files] = False
             self.progress.to_csv(self.progress_file, sep = '\t', index = True, header = True)
@@ -75,7 +75,7 @@ class project():
     def scan_all(self):
         # scan all files and update the progress table
         out_df = self.scan_h5ad()
-        other_files = self.config.keys()
+        other_files = list(self.config.keys())
         other_files.remove('raw'); other_files.remove('normalised')
         for dataset, prefix in out_df.index:
             for ftype in other_files:
