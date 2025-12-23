@@ -187,9 +187,9 @@ def add_cmd_args(parser):
         help = 'Number of components to identify for scIRED (default: 50)')
     parser.add_argument('--scired_genes', type = int, default = 2000,
         help = 'Number of highly variable genes to use for scIRED (default: 2000)')
-    parser.add_argument('--scired_covars', type = str, nargs = '+', default = [],
+    parser.add_argument('--scired_covars', type = str, nargs = '+', default = ['sex'],
         help = 'Covariate columns in adata.obs to adjust for in scIRED (default: none)')
-    parser.add_argument('--scired_explain', type = str, nargs = '+', default = [],
+    parser.add_argument('--scired_explain', type = str, nargs = '+', default = ['Type_updated'],
         help = 'Categorical factors in adata.obs to explain using FCAT in scIRED (default: none)')
     return parser
 
