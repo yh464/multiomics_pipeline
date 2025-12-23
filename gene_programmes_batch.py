@@ -25,9 +25,10 @@ def main(args):
     scired_outdir = os.path.realpath('../programmes/scired/%dataset%/%prefix%')
     proj.register('programmes_scired',f'{scired_outdir}/%prefix%_scired_loadings.txt')
     proj.register('programmes_scired_scores',f'{scired_outdir}/%prefix%_scired_scores.txt')
+    cnmf_components_str = ' '.join([str(x) for x in args.cnmf_components])
 
     for dataset, prefix in h5ad:
-        cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {args.cnmf_components} '+ \
+        cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} '+ \
             f'--scired_covars {" ".join(args.scired_covars)} --scired_explain {" ".join(args.scired_explain)}'
         if args.cnmf: cmd += ' --cnmf'
