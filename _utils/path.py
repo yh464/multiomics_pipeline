@@ -42,8 +42,6 @@ class project():
         else:
             self.progress = pd.read_csv(self.progress_file, sep = '\t', header = 0, index_col = ['dataset','prefix'])
 
-    def __del__(self): self.save() # ensure all updates to the progress and config files are saved
-
     def save(self): 
         self.progress.to_csv(self.progress_file, sep = '\t', index = True, header = True)
         with open(self.config_file, 'w') as f:
