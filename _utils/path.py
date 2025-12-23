@@ -145,7 +145,13 @@ class project():
         self.progress.loc[(dataset, prefix), ftype] = True
         self.progress.to_csv(self.progress_file, sep = '\t', index = True, header = True)
     
-    def to_pathname(self, ftype, *datasets):
+    def to_pathname(self, ftype, dataset, prefix):
+        if ftype not in self.config:
+            raise ValueError(f'File type {ftype} not found in path config')
+        pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+        return pattern
+
+    def to_pathname_multi(self, ftype, *datasets):
         datasets = self._to_long_format(*datasets)
         out = []
         for dataset, prefix in datasets:
