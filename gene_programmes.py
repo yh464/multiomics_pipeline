@@ -28,7 +28,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 121, 10), seed = 
     random_state: random seed
     '''
 
-    h5ad_raw = proj.to_pathname('raw', dataset, prefix)[0]
+    h5ad_raw = proj.to_pathname('raw', dataset, prefix)
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
 
     import cnmf
@@ -56,7 +56,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     n_components: number of components to identify
     random_state: random seed
     '''
-    h5ad_raw = proj.to_pathname('raw', dataset, prefix)[0]
+    h5ad_raw = proj.to_pathname('raw', dataset, prefix)
     adata = sc.read_h5ad(h5ad_raw)
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
     
