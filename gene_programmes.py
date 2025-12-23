@@ -191,6 +191,7 @@ def add_cmd_args(parser):
         help = 'Covariate columns in adata.obs to adjust for in scIRED (default: none)')
     parser.add_argument('--scired_explain', type = str, nargs = '+', default = ['Type_updated'],
         help = 'Categorical factors in adata.obs to explain using FCAT in scIRED (default: none)')
+    parser.add_argument('-f','--force', action = 'store_true', help = 'Force overwrite')
     return parser
 
 if __name__ == '__main__':

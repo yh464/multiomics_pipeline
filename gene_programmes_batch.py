@@ -33,6 +33,7 @@ def main(args):
             f'--scired_covars {" ".join(args.scired_covars)} --scired_explain {" ".join(args.scired_explain)}'
         if args.cnmf: cmd += ' --cnmf'
         if args.scired: cmd += ' --scired'
+        if args.force: cmd += ' --force'
         submitter.add(cmd)
     submitter.submit()
 
