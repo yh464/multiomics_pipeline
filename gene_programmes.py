@@ -37,7 +37,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 51, 10), seed = 1
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
     cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = 100, seed = seed)
     # n_processes = max(int(cpu_count() / 2), 2)
-    n_processes = 16
+    n_processes = 32
     log.log(f'Factorization with {n_processes} processes', calling_file = 'run_cnmf')
     cnmf_obj.factorize_multi_process(n_processes)
     cnmf_obj.combine()
@@ -46,6 +46,23 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 51, 10), seed = 1
     k_optim = k_selection_stats.k[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
     log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
     cnmf_obj.consensus(k = k_optim, density = 0.01)
+
+def run_spectra(dataset, prefix, outdir):
+    '''
+    run Spectra on input h5ad file (RAW COUNTS)
+    outdir: output directory
+    n_components will be estimated from data
+    '''
+    
+    h5ad_raw = proj.to_pathname('raw', dataset, prefix)
+    adata = sc.read_h5ad(h5ad_raw)
+    adata.X = adata.X.log1p() # convert to log counts
+    outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
+
+    import Spectra
+    annotations = Spectra.default_gene_sets.load()
+
+    pass
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
     covar_cols = [], factors_to_explain = [],           
@@ -71,20 +88,23 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     out_interpretability_fig = f'{outdir}/{prefix}_scired_interpretability.pdf'
 
     import sciRED
+    import sciRED.utils
+    import sciRED.ensembleFCA
     import statsmodels.api as sm
     from sklearn.preprocessing import StandardScaler
     from sklearn.decomposition import PCA
     from sklearn.pipeline import Pipeline
     from _plots.corr_heatmap import corr_heatmap
+    from _plots.colourcode_scatterplot import scatterplot_adata
     log.log(f'Conducting scIRED on input AnnData object', calling_file = 'run_scired')
     log.log(f'Output directory: {outdir}', calling_file = 'run_scired')
     log.log(f'Number of components to identify: {n_components}', calling_file = 'run_scired')
     log.log(f'Number of HV genes to use: {n_genes}', calling_file = 'run_scired')
     log.log(f'Covariates to adjust for: {", ".join(covar_cols)}', calling_file = 'run_scired')
-    rng = np.random.default_rng(seed)
+    np.random.seed(seed)
 
-    adata, gene_idx = sciRED.preprocess.get_sub_data(adata, num_genes = n_genes)
-    y, genes, num_cells, num_genes = sciRED.preprocess.get_data_array(adata)
+    adata, gene_idx = sciRED.utils.preprocess.get_sub_data(adata, num_genes = n_genes)
+    y, genes, num_cells, num_genes = sciRED.utils.preprocess.get_data_array(adata)
     adata.obs['n_umi'] = adata.X.sum(axis = 1)
 
     if os.path.isfile(out_loading) and os.path.isfile(out_scores) and not force:
@@ -110,15 +130,26 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         glm_fit_dict = sciRED.glm.poissonGLM(y, design_mat.values)
         resid_pearson = glm_fit_dict['resid_pearson']
         y = resid_pearson.T
-        pipeline = Pipeline([('scaling', StandardScaler()), ('pca', PCA(n_components=NUM_COMPONENTS))])
+        pipeline = Pipeline([('scaling', StandardScaler()), ('pca', PCA(n_components=n_components))])
         y_pca = pipeline.fit_transform(y)
         loading = pipeline.named_steps['pca'].components_.T
         rot_varimax = sciRED.rotations.varimax(loading)
         loading_varimax = rot_varimax['rotloading']
         y_varimax = sciRED.rotations.get_rotated_scores(y_pca, rot_varimax['rotmat'])
         
-        loading_varimax.to_csv(out_loading, sep = '\t', index = True, header = True)
-        y_varimax.to_csv(out_scores, sep = '\t', index = True, header = True)
+        # these variables are only used for output and should not affect downstream preprocessing
+        loading_varimax_ = pd.DataFrame(loading_varimax, index = genes, columns = [f'F{i+1}' for i in range(loading_varimax.shape[1])])
+        y_varimax_ = pd.DataFrame(y_varimax, index = adata.obs_names, columns = [f'F{i+1}' for i in range(y_varimax.shape[1])])
+        loading_varimax_.to_csv(out_loading, sep = '\t', index = True, header = True)
+        y_varimax_.to_csv(out_scores, sep = '\t', index = True, header = True)
+
+        # plot UMAP scatterplot for all factors
+        os.makedirs(f'{outdir}/plots', exist_ok = True)
+        for factor in y_varimax_.columns:
+            if 'X_umap' not in adata.obsm.keys(): continue
+            fig = scatterplot_adata(adata, v = y_varimax_[factor], rep = 'umap')
+            fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.pdf', bbox_inches = 'tight')
+            plt.close(fig)
 
     # FCAT analysis for factor importance
     fcat_mat = []
@@ -127,10 +158,10 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
             log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'run_scired', warning = True)
             continue
         elif pd.api.types.is_categorical_dtype(adata.obs[col]) or adata.obs[col].dtype == object:
-            fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col].values,  
+            fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
                 y_varimax, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
-            fcat_col['explained_factor'] = col
-            fcat_col = fcat_col.melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
+            fcat_col['explained_factor'] = fcat_col.index
+            fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
             fcat_col.insert(0, 'explained_group', col)
             fcat_col.insert(2, 'xlabel', 'sciRED Factor')
             fcat_mat.append(fcat_col)
@@ -138,7 +169,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
             log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'run_scired', warning = True)
     if len(fcat_mat) == 0: raise ValueError('No valid factors to explain provided.')
     fcat_mat = pd.concat(fcat_mat, axis = 0)
-    fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].values)
+    fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].dropna().values)
     fcat_mat['significance'] = fcat_mat['fcat_value'] >= fcat_thr
     fcat_mat.to_csv(out_fcat, sep = '\t', index = True, header = True)
     fig = corr_heatmap(fcat_mat, sort = False, sig_col = 'significance')
@@ -153,9 +184,11 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     interpretability_metrics = pd.DataFrame(index = [f'F{i+1}' for i in range(y_varimax.shape[1])], columns = [])
     silhouette_score = sciRED.metrics.kmeans_bimodal_score(y_varimax, time_eff = True)
     bimodality_index = sciRED.metrics.bimodality_index(y_varimax)
-    interpretability_metrics['bimodality_score'] = (silhouette_score + bimodality_index) / 2
+    interpretability_metrics['bimodality_score'] = (np.array(silhouette_score) + np.array(bimodality_index)) / 2
     interpretability_metrics['effect_size'] = sciRED.metrics.factor_variance(y_varimax)
-    interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(y_varimax)
+    interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(
+        fcat_mat.pivot(index = 'explained_factor', columns = 'scired_factor', values = 'fcat_value')
+    )
     for col in fcat_col.explained_group.unique():
         interpretability_metrics[f'homogeneity_{col}'] = sciRED.metrics.average_scaled_var(
             y_varimax, covariate_vector = adata.obs[col].values, mean_type = 'arithmetic') # spelling is correct for this function
@@ -178,7 +211,7 @@ def main(args):
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
             n_genes = args.scired_genes, covar_cols = args.scired_covars,
-            factors_to_explain = args.scired_explain, force = args.force)
+            factors_to_explain = args.cell_type, force = args.force)
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
@@ -190,9 +223,11 @@ def add_cmd_args(parser):
     parser.add_argument('--scired_genes', type = int, default = 2000,
         help = 'Number of highly variable genes to use for scIRED (default: 2000)')
     parser.add_argument('--scired_covars', type = str, nargs = '+', default = ['sex'],
-        help = 'Covariate columns in adata.obs to adjust for in scIRED (default: none)')
-    parser.add_argument('--scired_explain', type = str, nargs = '+', default = ['Type_updated'],
-        help = 'Categorical factors in adata.obs to explain using FCAT in scIRED (default: none)')
+        help = 'Covariate columns in adata.obs to adjust for in scIRED (default: sex)')
+    parser.add_argument('--cell_type', type = str, nargs = '+', default = ['Type_updated'],
+        help = '''Categorical factors in adata.obs that denote the cell type. 
+        First argument is used for both Spectra and sciRED interpretability analysis, 
+        subsequent args only for sciRED (default: Type_updated)''')
     parser.add_argument('-f','--force', action = 'store_true', help = 'Force overwrite')
     return parser
 

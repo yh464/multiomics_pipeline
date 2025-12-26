@@ -17,7 +17,7 @@ from _utils.slurm import array_submitter, add_slurm_args_dec
 
 def main(args):
     submitter = array_submitter(name = 'gene_programmes_batch_' + '_'.join(args.datasets),
-        partition = 'sapphire', n_cpu = 16, timeout = 240)
+        partition = 'sapphire', n_cpu = 32, timeout = 720)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cnmf_outdir = os.path.realpath('../programmes/cnmf/$dataset/$prefix')
@@ -30,7 +30,7 @@ def main(args):
     for dataset, prefix in h5ad:
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} '+ \
-            f'--scired_covars {" ".join(args.scired_covars)} --scired_explain {" ".join(args.scired_explain)}'
+            f'--scired_covars {" ".join(args.scired_covars)} --cell_type {" ".join(args.cell_type)}'
         if args.force: cmd += ' --force'
         if args.cnmf: submitter.add(cmd + ' --cnmf')
         if args.scired: submitter.add(cmd + ' --scired')
