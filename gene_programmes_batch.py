@@ -31,10 +31,9 @@ def main(args):
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} '+ \
             f'--scired_covars {" ".join(args.scired_covars)} --scired_explain {" ".join(args.scired_explain)}'
-        if args.cnmf: cmd += ' --cnmf'
-        if args.scired: cmd += ' --scired'
         if args.force: cmd += ' --force'
-        submitter.add(cmd)
+        if args.cnmf: submitter.add(cmd + ' --cnmf')
+        if args.scired: submitter.add(cmd + ' --scired')
     submitter.submit()
 
 from gene_programmes import add_cmd_args

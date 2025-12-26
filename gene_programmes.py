@@ -32,13 +32,14 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 121, 10), seed = 
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
 
     import cnmf
-    prefix = os.path.basename(h5ad_raw).replace('.h5ad','')
     log.log(f'Conducting cNMF on {h5ad_raw}', calling_file = 'run_cnmf')
-    log.log(f'Output directory: {outdir}', calling_file = 'run_cnmf')
+    log.log(f'Output directory: {outdir}/{prefix}', calling_file = 'run_cnmf')
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
     cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = 100, seed = seed)
-    log.log(f'Factorization with {cpu_count()} CPUs', calling_file = 'run_cnmf')
-    cnmf_obj.factorize_multi_process(cpu_count())
+    # n_processes = max(int(cpu_count() / 2), 2)
+    n_processes = 16
+    log.log(f'Factorization with {n_processes} processes', calling_file = 'run_cnmf')
+    cnmf_obj.factorize_multi_process(n_processes)
     cnmf_obj.combine()
     cnmf_obj.k_selection_plot()
     k_selection_stats = np.load(cnmf_obj.paths['k_selection_stats'])
@@ -169,7 +170,8 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     plt.close(fig)
 
 def main(args):
-    cnmf_outdir = os.path.dirname(proj.config['programmes_cnmf']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
+    cnmf_outdir = os.path.dirname(os.path.dirname(proj.config['programmes_cnmf'])).replace(
+        '$dataset', args.dataset).replace('$prefix', args.prefix) # cNMF automatically creates the $prefix subdirectory
     scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, force = args.force)
