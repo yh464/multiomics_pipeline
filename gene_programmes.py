@@ -20,7 +20,7 @@ from _utils.path import project
 proj = project()
 
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(10, 121, 10), seed = 19260817, force = False):
+def run_cnmf(dataset, prefix, outdir, n_components = range(10, 51, 10), seed = 19260817, force = False):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
     outdir: output directory
@@ -182,7 +182,7 @@ def main(args):
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
-    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 120, 10),
+    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 51, 10),
         help = 'Number of components to identify for cNMF (start, stop, step), default: 10 120 10')
     parser.add_argument('--scired', action = 'store_true', help = 'Run scIRED to identify gene programmes')
     parser.add_argument('--scired_components', type = int, default = 50,
