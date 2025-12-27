@@ -17,7 +17,7 @@ from _utils.slurm import array_submitter, add_slurm_args_dec
 
 def main(args):
     cnmf_submitter = array_submitter(name = 'cnmf_batch_' + '_'.join(args.datasets),
-        partition = 'sapphire', n_cpu = 6, timeout = 720)
+        partition = 'sapphire', n_cpu = 4, timeout = 720)
     scired_submitter = array_submitter(name = 'scired_batch_' + '_'.join(args.datasets),
         partition = 'sapphire', n_cpu = 32, timeout = 720)
     

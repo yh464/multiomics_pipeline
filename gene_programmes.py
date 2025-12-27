@@ -12,7 +12,7 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
+import os, time
 from fnmatch import fnmatch
 from multiprocessing import cpu_count
 from _utils.logger import logger
@@ -36,8 +36,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     log.log(f'Conducting cNMF on {h5ad_raw}', calling_file = 'run_cnmf')
     log.log(f'Output directory: {outdir}/{prefix}', calling_file = 'run_cnmf')
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
-    cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
-    if not force: cnmf_obj.update_nmf_iter_params(); skip_completed = True
+    while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
+        if worker_id == 0: # prevent other workers from simultaneously writing files
+            cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
+            cnmf_obj.update_nmf_iter_params()
+        else: time.sleep(10)
+    if not force: skip_completed = True
     else: skip_completed = False
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = skip_completed)
     n_spectra_complete = 0; n_usage_complete = 0
