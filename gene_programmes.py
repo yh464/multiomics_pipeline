@@ -64,6 +64,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
 def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 10), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
+    outdir = os.path.dirname(outdir)  # remove $prefix to get to the parent directory
     n_spectra_complete = 0
     for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
         for k in n_components:
