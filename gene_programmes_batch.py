@@ -16,7 +16,9 @@ proj = project()
 from _utils.slurm import array_submitter, add_slurm_args_dec
 
 def main(args):
-    submitter = array_submitter(name = 'gene_programmes_batch_' + '_'.join(args.datasets),
+    cnmf_submitter = array_submitter(name = 'cnmf_batch_' + '_'.join(args.datasets),
+        partition = 'sapphire', n_cpu = 6, timeout = 720)
+    scired_submitter = array_submitter(name = 'scired_batch_' + '_'.join(args.datasets),
         partition = 'sapphire', n_cpu = 32, timeout = 720)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
@@ -32,9 +34,11 @@ def main(args):
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} '+ \
             f'--scired_covars {" ".join(args.scired_covars)} --cell_type {" ".join(args.cell_type)}'
         if args.force: cmd += ' --force'
-        if args.cnmf: submitter.add(cmd + ' --cnmf')
-        if args.scired: submitter.add(cmd + ' --scired')
-    submitter.submit()
+        if args.cnmf: 
+            for worker_id in range(100): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
+        if args.scired: scired_submitter.add(cmd + ' --scired')
+    cnmf_submitter.submit()
+    scired_submitter.submit()
 
 from gene_programmes import add_cmd_args
 add_cmd_args = add_slurm_args_dec(add_cmd_args)

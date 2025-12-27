@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+from fnmatch import fnmatch
 from multiprocessing import cpu_count
 from _utils.logger import logger
 log = logger()
@@ -20,7 +21,7 @@ from _utils.path import project
 proj = project()
 
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(10, 51, 10), seed = 19260817, force = False):
+def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 19260817, force = False, worker_id = 0, n_iter = 100):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
     outdir: output directory
@@ -35,11 +36,20 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 51, 10), seed = 1
     log.log(f'Conducting cNMF on {h5ad_raw}', calling_file = 'run_cnmf')
     log.log(f'Output directory: {outdir}/{prefix}', calling_file = 'run_cnmf')
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
-    cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = 100, seed = seed)
-    # n_processes = max(int(cpu_count() / 2), 2)
-    n_processes = 32
-    log.log(f'Factorization with {n_processes} processes', calling_file = 'run_cnmf')
-    cnmf_obj.factorize_multi_process(n_processes)
+    cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
+    if not force: cnmf_obj.update_nmf_iter_params(); skip_completed = True
+    else: skip_completed = False
+    cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = skip_completed)
+    n_spectra_complete = 0; n_usage_complete = 0
+    for f in os.listdir(f'{outdir}/cnmf_tmp'):
+        for k in n_components:
+            if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
+            if fnmatch(f, f'{prefix}.usages.k_{k}.iter_*.df.npz'): n_usage_complete += 1
+    log.log(f'Completed {n_spectra_complete} / {len(n_components)*n_iter} spectra matrix factorizations', calling_file = 'run_cnmf')
+    log.log(f'Completed {n_usage_complete} / {len(n_components)*n_iter} usage matrix factorizations', calling_file = 'run_cnmf')
+    if n_spectra_complete < len(n_components)*n_iter or n_usage_complete < len(n_components)*n_iter:
+        log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
+        return
     cnmf_obj.combine()
     cnmf_obj.k_selection_plot()
     k_selection_stats = np.load(cnmf_obj.paths['k_selection_stats'])
@@ -215,8 +225,8 @@ def main(args):
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
-    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 51, 10),
-        help = 'Number of components to identify for cNMF (start, stop, step), default: 10 120 10')
+    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 71, 10),
+        help = 'Number of components to identify for cNMF (start, stop, step), default: 10 71 10')
     parser.add_argument('--scired', action = 'store_true', help = 'Run scIRED to identify gene programmes')
     parser.add_argument('--scired_components', type = int, default = 50,
         help = 'Number of components to identify for scIRED (default: 50)')
@@ -236,6 +246,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Identify gene expression programmes from scRNA-seq data')
     parser.add_argument('dataset', type = str, help = 'Dataset name')
     parser.add_argument('prefix', type = str, help = 'Prefix for output files')
+    parser.add_argument('--worker', type = int, default = 0, help = 'Worker ID for parallel processing (default: 0)')
     parser = add_cmd_args(parser)
     args = parser.parse_args()
     args.cnmf_components = range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2])
