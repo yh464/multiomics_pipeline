@@ -36,10 +36,11 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     log.log(f'Conducting cNMF on {h5ad_raw}', calling_file = 'run_cnmf')
     log.log(f'Output directory: {outdir}/{prefix}', calling_file = 'run_cnmf')
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
+    if worker_id == 0: cnmf_obj.update_nmf_iter_params()
+    else: time.sleep(3)
     while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
         if worker_id == 0: # prevent other workers from simultaneously writing files
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
-            cnmf_obj.update_nmf_iter_params()
         else: time.sleep(10)
     if not force: skip_completed = True
     else: skip_completed = False
@@ -227,8 +228,8 @@ def main(args):
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
-    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 71, 10),
-        help = 'Number of components to identify for cNMF (start, stop, step), default: 10 71 10')
+    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 70, 10),
+        help = 'Number of components to identify for cNMF (start, stop, step), default: 10 70 10')
     parser.add_argument('--scired', action = 'store_true', help = 'Run scIRED to identify gene programmes')
     parser.add_argument('--scired_components', type = int, default = 50,
         help = 'Number of components to identify for scIRED (default: 50)')
