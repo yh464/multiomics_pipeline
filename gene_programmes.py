@@ -59,7 +59,18 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
         k_selection_stats = pd.DataFrame(**file)
     k_optim = k_selection_stats.k[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
     log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
-    cnmf_obj.consensus(k = k_optim, density = 0.01)
+    cnmf_obj.consensus(k = k_optim, density_threshold = 0.01)
+
+def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 10), n_iter = 100):
+    '''check if cNMF has been completed for given dataset / prefix'''
+    outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
+    n_spectra_complete = 0
+    for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
+        for k in n_components:
+            if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
+    if n_spectra_complete < len(n_components)*n_iter:
+        return False
+    return True
 
 def run_spectra(dataset, prefix, outdir):
     '''
