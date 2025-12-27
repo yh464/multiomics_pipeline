@@ -45,7 +45,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     else: skip_completed = False
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = skip_completed)
     n_spectra_complete = 0; n_usage_complete = 0
-    for f in os.listdir(f'{outdir}/cnmf_tmp'):
+    for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
         for k in n_components:
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
             if fnmatch(f, f'{prefix}.usages.k_{k}.iter_*.df.npz'): n_usage_complete += 1
