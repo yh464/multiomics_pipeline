@@ -44,14 +44,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     if not force: skip_completed = True
     else: skip_completed = False
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = skip_completed)
-    n_spectra_complete = 0; n_usage_complete = 0
+    n_spectra_complete = 0
     for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
         for k in n_components:
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
-            if fnmatch(f, f'{prefix}.usages.k_{k}.iter_*.df.npz'): n_usage_complete += 1
     log.log(f'Completed {n_spectra_complete} / {len(n_components)*n_iter} spectra matrix factorizations', calling_file = 'run_cnmf')
-    log.log(f'Completed {n_usage_complete} / {len(n_components)*n_iter} usage matrix factorizations', calling_file = 'run_cnmf')
-    if n_spectra_complete < len(n_components)*n_iter or n_usage_complete < len(n_components)*n_iter:
+    if n_spectra_complete < len(n_components)*n_iter:
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
     cnmf_obj.combine()
@@ -221,7 +219,7 @@ def main(args):
         '$dataset', args.dataset).replace('$prefix', args.prefix) # cNMF automatically creates the $prefix subdirectory
     scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
-        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, force = args.force)
+        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, force = args.force, worker_id = args.worker)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
             n_genes = args.scired_genes, covar_cols = args.scired_covars,
