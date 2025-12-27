@@ -55,7 +55,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
         return
     cnmf_obj.combine()
     cnmf_obj.k_selection_plot()
-    k_selection_stats = np.load(cnmf_obj.paths['k_selection_stats'])
+    with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
+        k_selection_stats = pd.DataFrame(**file)
     k_optim = k_selection_stats.k[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
     log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
     cnmf_obj.consensus(k = k_optim, density = 0.01)
