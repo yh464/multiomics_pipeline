@@ -19,7 +19,8 @@ from _utils.logger import logger
 log = logger()
 from _utils.path import project
 proj = project()
-
+from _plots.corr_heatmap import corr_heatmap
+from _plots.colourcode_scatterplot import scatterplot_adata
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 19260817, force = False, worker_id = 0, n_iter = 100):
     '''
@@ -66,6 +67,15 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
     log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
     cnmf_obj.consensus(k = k_optim, density_threshold = 0.01)
+    plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
+    os.makedirs(plot_dir, exist_ok = True)
+    usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%d', '0_01'), index_col = 0)
+    adata = sc.read_h5ad(h5ad_raw, 'r')
+    for component in usages.columns:
+        if 'X_umap' not in adata.obsm.keys(): continue
+        fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
+        fig.savefig(f'{plot_dir}/{prefix}_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
 
 def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 10), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
@@ -126,8 +136,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     from sklearn.preprocessing import StandardScaler
     from sklearn.decomposition import PCA
     from sklearn.pipeline import Pipeline
-    from _plots.corr_heatmap import corr_heatmap
-    from _plots.colourcode_scatterplot import scatterplot_adata
+
     log.log(f'Conducting scIRED on input AnnData object', calling_file = 'run_scired')
     log.log(f'Output directory: {outdir}', calling_file = 'run_scired')
     log.log(f'Number of components to identify: {n_components}', calling_file = 'run_scired')
@@ -180,7 +189,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         for factor in y_varimax_.columns:
             if 'X_umap' not in adata.obsm.keys(): continue
             fig = scatterplot_adata(adata, v = y_varimax_[factor], rep = 'umap')
-            fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.pdf', bbox_inches = 'tight')
+            fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
 
     # FCAT analysis for factor importance
