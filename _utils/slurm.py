@@ -133,12 +133,8 @@ class array_submitter():
         print(f'Max {self.lim} batches * {self.parallel} commands per file, {self.arraysize} files per array job')
 
         # directories
-        self.logdir = f'{log}/{self.name}' # to prevent confusion with other array submissions
-        if not os.path.isdir(self.logdir): os.mkdir(self.logdir)
-        os.system(f'rm -rf {self.logdir}/*') # clear temp files from the previous run
-        self.tmpdir = f'{tmpdir}/{self.name}' # to prevent confusion with other array submissions
-        if not os.path.isdir(self.tmpdir): os.mkdir(self.tmpdir)
-        os.system(f'rm -rf {self.tmpdir}/*') # clear temp files from the previous run
+        self.logdir = f'{log}/{self.name}'
+        self.tmpdir = f'{tmpdir}/{self.name}'
 
         # commands are staged up to an array size limit before a new job array is initialised
         self.array_cmd_limit = self.arraysize * self.lim * self.parallel
@@ -275,6 +271,12 @@ class array_submitter():
     def _dump(self):
         if len(self._staged_cmd) == 0: return
         cmds_to_dump = self._staged_cmd[:min(len(self._staged_cmd), self.array_cmd_limit)]
+
+        # make directories and remove temp files from previous runs
+        os.makedirs(self.logdir, exist_ok = True)
+        os.makedirs(self.tmpdir, exist_ok = True)
+        os.system(f'rm -rf {self.logdir}/*')
+        os.system(f'rm -rf {self.tmpdir}/*')
 
         # organise cmds into parallel batches
         if self.parallel > 1:

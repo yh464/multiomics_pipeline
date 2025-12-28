@@ -150,7 +150,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         for col in covar_cols:
             if col not in adata.obs.columns:
                 raise ValueError(f'Covariate column {col} not found in adata.obs')
-            if pd.api.types.is_categorical_dtype(adata.obs[col]) or adata.obs[col].dtype == object:
+            if isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object:
                 dummies = pd.get_dummies(adata.obs[col], prefix = col, drop_first = True)
                 design_mat.append(dummies)
             else:
@@ -159,7 +159,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         design_mat = sm.add_constant(design_mat, has_constant = 'add')
 
         # factor identification for sciRED
-        glm_fit_dict = sciRED.glm.poissonGLM(y, design_mat.values)
+        glm_fit_dict = sciRED.glm.poissonGLM(y, design_mat.astype(float).values)
         resid_pearson = glm_fit_dict['resid_pearson']
         y = resid_pearson.T
         pipeline = Pipeline([('scaling', StandardScaler()), ('pca', PCA(n_components=n_components))])
