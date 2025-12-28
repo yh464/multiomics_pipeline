@@ -149,8 +149,10 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     adata.obs['n_umi'] = adata.X.sum(axis = 1)
 
     if os.path.isfile(out_loading) and os.path.isfile(out_scores) and not force:
-        y_varimax = pd.read_table(out_scores, index_col = 0)
-        loading_varimax = pd.read_table(out_loading, index_col = 0)
+        y_varimax_ = pd.read_table(out_scores, index_col = 0)
+        loading_varimax_ = pd.read_table(out_loading, index_col = 0)
+        y_varimax = y_varimax_.values
+        loading_varimax = loading_varimax_.values
         log.log(f'Found existing scIRED output files, loading from {outdir}', calling_file = 'run_scired')
     else:
         # get covariates
@@ -184,13 +186,13 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         loading_varimax_.to_csv(out_loading, sep = '\t', index = True, header = True)
         y_varimax_.to_csv(out_scores, sep = '\t', index = True, header = True)
 
-        # plot UMAP scatterplot for all factors
-        os.makedirs(f'{outdir}/plots', exist_ok = True)
-        for factor in y_varimax_.columns:
-            if 'X_umap' not in adata.obsm.keys(): continue
-            fig = scatterplot_adata(adata, v = y_varimax_[factor], rep = 'umap')
-            fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
-            plt.close(fig)
+    # plot UMAP scatterplot for all factors
+    os.makedirs(f'{outdir}/plots', exist_ok = True)
+    for factor in y_varimax_.columns:
+        if 'X_umap' not in adata.obsm.keys(): continue
+        fig = scatterplot_adata(adata, v = y_varimax_[factor], rep = 'umap')
+        fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
 
     # FCAT analysis for factor importance
     fcat_mat = []
