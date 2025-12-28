@@ -36,8 +36,14 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     log.log(f'Conducting cNMF on {h5ad_raw}', calling_file = 'run_cnmf')
     log.log(f'Output directory: {outdir}/{prefix}', calling_file = 'run_cnmf')
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
-    if worker_id == 0: cnmf_obj.update_nmf_iter_params()
-    else: time.sleep(3)
+    if worker_id == 0: 
+        replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
+            ks = n_components, n_iter = n_iter, random_state_seed = seed,
+            beta_loss = 'frobenius', init = 'random', alpha_usage = 0.0, alpha_spectra = 0.0, max_iter = 1000
+        )
+        cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
+        cnmf_obj.update_nmf_iter_params()
+    else: time.sleep(5)
     while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
         if worker_id == 0: # prevent other workers from simultaneously writing files
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
@@ -49,7 +55,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
         for k in n_components:
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
-    log.log(f'Completed {n_spectra_complete} / {len(n_components)*n_iter} spectra matrix factorizations', calling_file = 'run_cnmf')
+    log.log(f'Completed {n_spectra_complete} / {len(n_components)*n_iter} NMF iterations', calling_file = 'run_cnmf')
     if n_spectra_complete < len(n_components)*n_iter:
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
