@@ -253,9 +253,11 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     log.log(f'Max correlation between identified factors and library size (n_umi): {np.abs(corr_numi).max():.4f}', calling_file = 'run_scired')
 
     # interpretability scoring
+    from joblib import parallel_backend
     interpretability_metrics = pd.DataFrame(index = [f'F{i+1}' for i in range(y_varimax.shape[1])], columns = [])
-    silhouette_score = sciRED.metrics.kmeans_bimodal_score(y_varimax, time_eff = True)
-    bimodality_index = sciRED.metrics.bimodality_index(y_varimax)
+    with parallel_backend('threading', n_jobs = 32):
+        silhouette_score = sciRED.metrics.kmeans_bimodal_score(y_varimax, time_eff = True)
+        bimodality_index = sciRED.metrics.bimodality_index(y_varimax)
     interpretability_metrics['bimodality_score'] = (np.array(silhouette_score) + np.array(bimodality_index)) / 2
     interpretability_metrics['effect_size'] = sciRED.metrics.factor_variance(y_varimax)
     interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(
