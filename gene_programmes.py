@@ -76,6 +76,9 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
         fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
         fig.savefig(f'{plot_dir}/{prefix}_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
+    
+    proj.complete_step('programmes_cnmf', dataset, prefix)
+    proj.complete_step('programmes_cnmf_scores', dataset, prefix)
 
 def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 10), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
@@ -121,11 +124,11 @@ def run_spectra(dataset, prefix, outdir, cell_type):
         num_epochs = 10000
     )
 
-    adata.uns['SPECTRA_factors'].to_csv(f'{outdir}/{prefix}_spectra_factors.txt', sep = '\t', index = True, header = True)
+    adata.uns['SPECTRA_factors'].to_csv(f'{outdir}/{prefix}_spectra_loadings.txt', sep = '\t', index = True, header = True)
     adata.uns['SPECTRA_markers'].to_csv(f'{outdir}/{prefix}_spectra_markers.txt', sep = '\t', index = True, header = True)
     cell_scores = adata.obsm['SPECTRA_cell_scores']
     cell_scores = pd.DataFrame(cell_scores, index = adata.obs_names, columns = [f'Spectra_F{i+1}' for i in range(cell_scores.shape[1])])
-    cell_scores.to_csv(f'{outdir}/{prefix}_spectra_cell_scores.txt', sep = '\t', index = True, header = True)
+    cell_scores.to_csv(f'{outdir}/{prefix}_spectra_scores.txt', sep = '\t', index = True, header = True)
     os.makedirs(f'{outdir}/plots', exist_ok = True)
     for factor in cell_scores.columns:
         if 'X_umap' not in adata.obsm.keys(): continue
@@ -133,7 +136,9 @@ def run_spectra(dataset, prefix, outdir, cell_type):
         fig.savefig(f'{outdir}/plots/{prefix}_spectra_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
     adata.var[['spectra_vocab']].to_csv(f'{outdir}/{prefix}_spectra_vocab.txt', sep = '\t', index = True, header = True)
-    pass
+    
+    proj.complete_step('programmes_spectra', dataset, prefix)
+    proj.complete_step('programmes_spectra_scores', dataset, prefix)
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
     covar_cols = [], factors_to_explain = [],           
@@ -277,16 +282,22 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     fig.savefig(out_interpretability_fig, bbox_inches = 'tight')
     plt.close(fig)
 
+    proj.complete_step('programmes_scired', dataset, prefix)
+    proj.complete_step('programmes_scired_scores', dataset, prefix)
+
 def main(args):
     cnmf_outdir = os.path.dirname(os.path.dirname(proj.config['programmes_cnmf'])).replace(
         '$dataset', args.dataset).replace('$prefix', args.prefix) # cNMF automatically creates the $prefix subdirectory
     scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
+    spectra_outdir = os.path.dirname(proj.config['programmes_spectra']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, force = args.force, worker_id = args.worker)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
             n_genes = args.scired_genes, covar_cols = args.scired_covars,
             factors_to_explain = args.cell_type, force = args.force)
+    if args.spectra:
+        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0])
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
@@ -299,6 +310,7 @@ def add_cmd_args(parser):
         help = 'Number of highly variable genes to use for scIRED (default: 2000)')
     parser.add_argument('--scired_covars', type = str, nargs = '+', default = ['sex'],
         help = 'Covariate columns in adata.obs to adjust for in scIRED (default: sex)')
+    parser.add_argument('--spectra', action = 'store_true', help = 'Run Spectra to identify gene programmes')
     parser.add_argument('--cell_type', type = str, nargs = '+', default = ['Type_updated'],
         help = '''Categorical factors in adata.obs that denote the cell type. 
         First argument is used for both Spectra and sciRED interpretability analysis, 
