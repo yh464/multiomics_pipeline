@@ -61,7 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('datasets', nargs = '+', help = 'List of dataset names / prefixes to process')
     parser = add_cmd_args(parser)
     args = parser.parse_args()
-    if not args.scired and not args.cnmf:
+    if not args.scired and not args.cnmf and not args.spectra:
         log.warn('No method selected, defaults to cNMF')
         args.cnmf = True
 
