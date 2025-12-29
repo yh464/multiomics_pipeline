@@ -89,7 +89,7 @@ def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 1
         return False
     return True
 
-def run_spectra(dataset, prefix, outdir):
+def run_spectra(dataset, prefix, outdir, cell_type):
     '''
     run Spectra on input h5ad file (RAW COUNTS)
     outdir: output directory
@@ -103,7 +103,36 @@ def run_spectra(dataset, prefix, outdir):
 
     import Spectra
     annotations = Spectra.default_gene_sets.load()
+    model = Spectra.est_spectra(
+        adata = adata,
+        gene_set_dictionary = annotations,
+        use_highly_variable = True,
+        cell_type_key = cell_type,
+        lam = 0.1,
+        delta = 0.001,
+        kappa = None,
+        rho = 0.001,
+        use_cell_types = True,
+        n_top_vals = 50,
+        label_factors = True,
+        overlap_threshold = 0.2, 
+        clean_gs = True,
+        min_gs_num = 3,
+        num_epochs = 10000
+    )
 
+    adata.uns['SPECTRA_factors'].to_csv(f'{outdir}/{prefix}_spectra_factors.txt', sep = '\t', index = True, header = True)
+    adata.uns['SPECTRA_markers'].to_csv(f'{outdir}/{prefix}_spectra_markers.txt', sep = '\t', index = True, header = True)
+    cell_scores = adata.obsm['SPECTRA_cell_scores']
+    cell_scores = pd.DataFrame(cell_scores, index = adata.obs_names, columns = [f'Spectra_F{i+1}' for i in range(cell_scores.shape[1])])
+    cell_scores.to_csv(f'{outdir}/{prefix}_spectra_cell_scores.txt', sep = '\t', index = True, header = True)
+    os.makedirs(f'{outdir}/plots', exist_ok = True)
+    for factor in cell_scores.columns:
+        if 'X_umap' not in adata.obsm.keys(): continue
+        fig = scatterplot_adata(adata, v = cell_scores[factor], rep = 'umap')
+        fig.savefig(f'{outdir}/plots/{prefix}_spectra_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
+    adata.var[['spectra_vocab']].to_csv(f'{outdir}/{prefix}_spectra_vocab.txt', sep = '\t', index = True, header = True)
     pass
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
@@ -200,7 +229,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         if col not in adata.obs.columns:
             log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'run_scired', warning = True)
             continue
-        elif pd.api.types.is_categorical_dtype(adata.obs[col]) or adata.obs[col].dtype == object:
+        elif isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object:
             fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
                 y_varimax, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
             fcat_col['explained_factor'] = fcat_col.index
@@ -221,7 +250,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
 
     # correlation with n_umi
     corr_numi = sciRED.utils.corr.get_factor_libsize_correlation(y_varimax, adata.obs['n_umi'].values)
-    log.log(f'Max correlation between identified factors and library size (n_umi): {corr_numi.abs().max():.4f}', calling_file = 'run_scired')
+    log.log(f'Max correlation between identified factors and library size (n_umi): {np.abs(corr_numi).max():.4f}', calling_file = 'run_scired')
 
     # interpretability scoring
     interpretability_metrics = pd.DataFrame(index = [f'F{i+1}' for i in range(y_varimax.shape[1])], columns = [])
@@ -232,7 +261,8 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(
         fcat_mat.pivot(index = 'explained_factor', columns = 'scired_factor', values = 'fcat_value')
     )
-    for col in fcat_col.explained_group.unique():
+    for col in factors_to_explain:
+        if col not in adata.obs.columns or not (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object): continue
         interpretability_metrics[f'homogeneity_{col}'] = sciRED.metrics.average_scaled_var(
             y_varimax, covariate_vector = adata.obs[col].values, mean_type = 'arithmetic') # spelling is correct for this function
     interpretability_metrics.to_csv(out_interpretability, sep = '\t', index = True, header = True)
