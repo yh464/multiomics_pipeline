@@ -80,9 +80,10 @@ class project():
         for dataset, prefix in out_df.index:
             for ftype in other_files:
                 pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
-                if os.path.isfile(pattern):
+                if os.path.exists(pattern):
                     out_df.loc[(dataset, prefix), ftype] = True
-                elif any([fnmatch(file, pattern) for file in os.listdir(os.path.dirname(pattern))]): # in case path contains wildcards
+                elif os.path.exists(os.path.dirname(pattern)) and \
+                    any([fnmatch(file, os.path.basename(pattern)) for file in os.listdir(os.path.dirname(pattern))]): # in case path contains wildcards
                     out_df.loc[(dataset, prefix), ftype] = True
                 else:
                     out_df.loc[(dataset, prefix), ftype] = False
