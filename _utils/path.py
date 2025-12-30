@@ -50,19 +50,21 @@ class project():
     def scan_h5ad(self): # special function to scan for original and normalised h5ad files
         raw_list = []
         raw_pattern = self.config['raw'].replace('$dataset','*').replace('$prefix','*')
-        for root, _, files in os.walk(f'{self.project_root}/raw'):
-            for file in files:
-                full_path = os.path.join(root, file)
-                if fnmatch(full_path, raw_pattern):
-                    raw_list.append((os.path.basename(root), file)) # (dataset, prefix) tuple
+        for dataset in os.listdir(f'{self.project_root}/raw'):
+            if not os.path.isdir(f'{self.project_root}/raw/{dataset}'): continue
+            for prefix in os.listdir(f'{self.project_root}/raw/{dataset}'):
+                full_path = os.path.join(self.project_root, 'raw', dataset, prefix)
+                if fnmatch(full_path, raw_pattern) and full_path.endswith('.h5ad'):
+                    raw_list.append((dataset, prefix.replace('.h5ad','').replace('.gz',''))) # (dataset, prefix) tuple
 
         norm_list = []
         norm_pattern = self.config['normalised'].replace('$dataset','*').replace('$prefix','*')
-        for root, _, files in os.walk(f'{self.project_root}/normalised'):
-            for file in files:
-                full_path = os.path.join(root, file)
-                if fnmatch(full_path, norm_pattern):
-                    norm_list.append((os.path.basename(root), file)) # (dataset, prefix) tuple
+        for dataset in os.listdir(f'{self.project_root}/normalised'):
+            if not os.path.isdir(f'{self.project_root}/normalised/{dataset}'): continue
+            for prefix in os.listdir(f'{self.project_root}/normalised/{dataset}'):
+                full_path = os.path.join(self.project_root, 'normalised', dataset, prefix)
+                if fnmatch(full_path, norm_pattern) and full_path.endswith('.h5ad'):
+                    norm_list.append((dataset, prefix.replace('.h5ad','').replace('.gz',''))) # (dataset, prefix) tuple
         
         out_df = pd.DataFrame(index = pd.MultiIndex.from_tuples(list(set(raw_list + norm_list)), names = ['dataset', 'prefix']),
             columns = ['raw', 'normalised'], data = False)
