@@ -36,7 +36,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     import cnmf
     log.log(f'Conducting cNMF on {h5ad_raw}', calling_file = 'run_cnmf')
     log.log(f'Output directory: {outdir}/{prefix}', calling_file = 'run_cnmf')
+
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
+
+    # check progress and preprocess data
     if worker_id == 0: 
         replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
             ks = n_components, n_iter = n_iter, random_state_seed = seed,
@@ -49,6 +52,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
         if worker_id == 0: # prevent other workers from simultaneously writing files
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
         else: time.sleep(10)
+    
+    # run NMF iterations
     if not force: skip_completed = True
     else: skip_completed = False
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = skip_completed)
@@ -60,16 +65,22 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
     if n_spectra_complete < len(n_components)*n_iter:
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
-    cnmf_obj.combine()
+    
+    # combine iterations
+    if not all([os.path.isfile(cnmf_obj.paths['merged_spectra'].replace(r'%d', str(k))) for k in n_components]) or args.force:
+        cnmf_obj.combine()
     cnmf_obj.k_selection_plot()
     with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
         k_selection_stats = pd.DataFrame(**file)
     k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
     log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
-    cnmf_obj.consensus(k = k_optim, density_threshold = 0.01)
+
+    # consensus factor decomposition
+    if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01')) or args.force:
+        cnmf_obj.consensus(k = k_optim, density_threshold = 0.01)
     plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
     os.makedirs(plot_dir, exist_ok = True)
-    usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%d', '0_01'), index_col = 0)
+    usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
     for component in usages.columns:
         if 'X_umap' not in adata.obsm.keys(): continue
