@@ -22,7 +22,36 @@ proj = project()
 from _plots.corr_heatmap import corr_heatmap
 from _plots.colourcode_scatterplot import scatterplot_adata
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 19260817, force = False, worker_id = 0, n_iter = 100):
+def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
+    # FCAT analysis for factor importance
+    import sciRED.ensembleFCA
+    fcat_mat = []
+    for col in factors_to_explain:
+        if col not in adata.obs.columns:
+            log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'run_scired', warning = True)
+            continue
+        elif isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object:
+            fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
+                scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
+            fcat_col['explained_factor'] = fcat_col.index
+            fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
+            fcat_col.insert(0, 'explained_group', col)
+            fcat_col.insert(2, 'xlabel', 'sciRED Factor')
+            fcat_mat.append(fcat_col)
+        else:
+            log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'run_scired', warning = True)
+    if len(fcat_mat) == 0: raise ValueError('No valid factors to explain provided.')
+    fcat_mat = pd.concat(fcat_mat, axis = 0)
+    fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].dropna().values)
+    fcat_mat['significance'] = fcat_mat['fcat_value'] >= fcat_thr
+    fcat_mat.to_csv(out_tabular, sep = '\t', index = True, header = True)
+    fig = corr_heatmap(fcat_mat, sort = False, sig_col = 'significance')
+    fig.savefig(out_fig, bbox_inches = 'tight')
+    plt.close(fig)
+    return fcat_mat
+
+def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_type = [],
+    seed = 19260817, force = False, worker_id = 0, n_iter = 100):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
     outdir: output directory
@@ -87,6 +116,11 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), seed = 1
         fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
         fig.savefig(f'{plot_dir}/{prefix}_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
+
+    # factor importance scoring
+    out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
+    out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
+    factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
     
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
@@ -152,7 +186,7 @@ def run_spectra(dataset, prefix, outdir, cell_type):
     proj.complete_step('programmes_spectra_scores', dataset, prefix)
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
-    covar_cols = [], factors_to_explain = [],           
+    covar_cols = [], cell_type = [],           
     seed = 19260817, force = False):
     '''
     run consensus NMF on input h5ad file
@@ -240,29 +274,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         plt.close(fig)
 
     # FCAT analysis for factor importance
-    fcat_mat = []
-    for col in factors_to_explain:
-        if col not in adata.obs.columns:
-            log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'run_scired', warning = True)
-            continue
-        elif isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object:
-            fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
-                y_varimax, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
-            fcat_col['explained_factor'] = fcat_col.index
-            fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
-            fcat_col.insert(0, 'explained_group', col)
-            fcat_col.insert(2, 'xlabel', 'sciRED Factor')
-            fcat_mat.append(fcat_col)
-        else:
-            log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'run_scired', warning = True)
-    if len(fcat_mat) == 0: raise ValueError('No valid factors to explain provided.')
-    fcat_mat = pd.concat(fcat_mat, axis = 0)
-    fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].dropna().values)
-    fcat_mat['significance'] = fcat_mat['fcat_value'] >= fcat_thr
-    fcat_mat.to_csv(out_fcat, sep = '\t', index = True, header = True)
-    fig = corr_heatmap(fcat_mat, sort = False, sig_col = 'significance')
-    fig.savefig(out_fcat_fig, bbox_inches = 'tight')
-    plt.close(fig)
+    fcat_mat = factor_importance(y_varimax, adata, cell_type, out_fcat, out_fcat_fig)
 
     # correlation with n_umi
     corr_numi = sciRED.utils.corr.get_factor_libsize_correlation(y_varimax, adata.obs['n_umi'].values)
@@ -279,7 +291,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(
         fcat_mat.pivot(index = 'explained_factor', columns = 'scired_factor', values = 'fcat_value')
     )
-    for col in factors_to_explain:
+    for col in cell_type:
         if col not in adata.obs.columns or not (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object): continue
         interpretability_metrics[f'homogeneity_{col}'] = sciRED.metrics.average_scaled_var(
             y_varimax, covariate_vector = adata.obs[col].values, mean_type = 'arithmetic') # spelling is correct for this function
@@ -302,11 +314,12 @@ def main(args):
     scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     spectra_outdir = os.path.dirname(proj.config['programmes_spectra']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
-        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, force = args.force, worker_id = args.worker)
+        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, 
+            cell_type = args.cell_type, force = args.force, worker_id = args.worker)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
             n_genes = args.scired_genes, covar_cols = args.scired_covars,
-            factors_to_explain = args.cell_type, force = args.force)
+            cell_type = args.cell_type, force = args.force)
     if args.spectra:
         run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0])
         
