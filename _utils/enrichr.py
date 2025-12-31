@@ -100,8 +100,11 @@ def enrichr_list(genes, background = None, databases =
     return pd.concat(out).sort_values(by = 'p_val').reset_index(drop = True)
 
 def enrichr_continuous(df, top = -1, by = None, top_negative = True, databases =
-    ['GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 'SynGO_2024']):
+    ['GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 'SynGO_2024'],
+    use_background = True
+    ):
     genes_lists, background = get_genes_list(df, top = top, by = by, top_negative = top_negative)
+    if not use_background: background = None
     out = []
     out.append(enrichr_list(genes_lists[0], background = background, databases = databases).assign(sign = '+'))
     log.log('top positive genes:')

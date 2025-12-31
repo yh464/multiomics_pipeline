@@ -28,7 +28,7 @@ def factor_enrichr(scores, top_negative = True):
     out = []
     for col in scores.columns:
         log.log(f'Enrichr analysis for factor {col}', calling_file = 'factor_enrichr')
-        enrichr_res = enrichr_continuous(scores, by = col, top = 1000, top_negative = top_negative)
+        enrichr_res = enrichr_continuous(scores, by = col, top = 1000, top_negative = top_negative, use_background = False)
         enrichr_res.insert(0, 'factor', col)
         out.append(enrichr_res)
     out = pd.concat(out, axis = 0)
