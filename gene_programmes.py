@@ -21,6 +21,24 @@ from _utils.path import project
 proj = project()
 from _plots.corr_heatmap import corr_heatmap
 from _plots.colourcode_scatterplot import scatterplot_adata
+from _utils.enrichr import enrichr_continuous
+
+def factor_enrichr(scores, top_negative = True):
+    out = []
+    for col in scores.columns:
+        log.log(f'Enrichr analysis for factor {col}', calling_file = 'factor_enrichr')
+        enrichr_res = enrichr_continuous(
+            scores, by = col, top = 1000, top_negative = top_negative,
+            background = None,
+            databases = [
+                'GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 
+                'KEGG_2021_Human', 'Reactome_2022', 'WikiPathways_2021_Human', 'Panther_2016', 'MSigDB_Hallmark_2020'
+            ]
+        )
+        enrichr_res.insert(0, 'factor', col)
+        out.append(enrichr_res)
+    out = pd.concat(out, axis = 0)
+    return out
 
 def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     # FCAT analysis for factor importance
@@ -28,7 +46,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     fcat_mat = []
     for col in factors_to_explain:
         if col not in adata.obs.columns:
-            log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'run_scired', warning = True)
+            log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'factor_importance', warning = True)
             continue
         elif isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object:
             fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
@@ -39,7 +57,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
             fcat_col.insert(2, 'xlabel', 'sciRED Factor')
             fcat_mat.append(fcat_col)
         else:
-            log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'run_scired', warning = True)
+            log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'factor_importance', warning = True)
     if len(fcat_mat) == 0: raise ValueError('No valid factors to explain provided.')
     fcat_mat = pd.concat(fcat_mat, axis = 0)
     fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].dropna().values)
@@ -114,13 +132,18 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
     for component in usages.columns:
         if 'X_umap' not in adata.obsm.keys(): continue
         fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
-        fig.savefig(f'{plot_dir}/{prefix}_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
+        fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
 
     # factor importance scoring
     out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
     factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
+
+    # enrichment analysis
+    out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
+    enrichr_res = factor_enrichr(usages, top_negative = False)
+    enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
@@ -207,6 +230,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     out_fcat_fig = f'{outdir}/{prefix}_scired_fcat.pdf'
     out_interpretability = f'{outdir}/{prefix}_scired_interpretability.txt'
     out_interpretability_fig = f'{outdir}/{prefix}_scired_interpretability.pdf'
+    out_enrichr = f'{outdir}/{prefix}_scired_enrichr.txt'
 
     import sciRED
     import sciRED.utils
@@ -276,26 +300,35 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     # FCAT analysis for factor importance
     fcat_mat = factor_importance(y_varimax, adata, cell_type, out_fcat, out_fcat_fig)
 
+    # enrichment analysis
+    enrichr_res = factor_enrichr(y_varimax, top_negative = True)
+    enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
+
     # correlation with n_umi
     corr_numi = sciRED.utils.corr.get_factor_libsize_correlation(y_varimax, adata.obs['n_umi'].values)
     log.log(f'Max correlation between identified factors and library size (n_umi): {np.abs(corr_numi).max():.4f}', calling_file = 'run_scired')
 
     # interpretability scoring
-    from joblib import parallel_backend
-    interpretability_metrics = pd.DataFrame(index = [f'F{i+1}' for i in range(y_varimax.shape[1])], columns = [])
-    with parallel_backend('threading', n_jobs = 32):
-        silhouette_score = sciRED.metrics.kmeans_bimodal_score(y_varimax, time_eff = True)
-        bimodality_index = sciRED.metrics.bimodality_index(y_varimax)
-    interpretability_metrics['bimodality_score'] = (np.array(silhouette_score) + np.array(bimodality_index)) / 2
-    interpretability_metrics['effect_size'] = sciRED.metrics.factor_variance(y_varimax)
-    interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(
-        fcat_mat.pivot(index = 'explained_factor', columns = 'scired_factor', values = 'fcat_value')
-    )
-    for col in cell_type:
-        if col not in adata.obs.columns or not (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object): continue
-        interpretability_metrics[f'homogeneity_{col}'] = sciRED.metrics.average_scaled_var(
-            y_varimax, covariate_vector = adata.obs[col].values, mean_type = 'arithmetic') # spelling is correct for this function
-    interpretability_metrics.to_csv(out_interpretability, sep = '\t', index = True, header = True)
+    if os.path.isfile(out_interpretability) and not force:
+        interpretability_metrics = pd.read_table(out_interpretability, index_col = 0)
+        log.log(f'Found existing scIRED interpretability output file, loading from {out_interpretability}', calling_file = 'run_scired')
+    else:
+        log.log(f'Calculating scIRED factor interpretability metrics', calling_file = 'run_scired')
+        from joblib import parallel_backend
+        interpretability_metrics = pd.DataFrame(index = [f'F{i+1}' for i in range(y_varimax.shape[1])], columns = [])
+        with parallel_backend('threading', n_jobs = 32):
+            silhouette_score = sciRED.metrics.kmeans_bimodal_score(y_varimax, time_eff = True)
+            bimodality_index = sciRED.metrics.bimodality_index(y_varimax)
+        interpretability_metrics['bimodality_score'] = (np.array(silhouette_score) + np.array(bimodality_index)) / 2
+        interpretability_metrics['effect_size'] = sciRED.metrics.factor_variance(y_varimax)
+        interpretability_metrics['specificity_score'] = sciRED.metrics.simpson_diversity_index(
+            fcat_mat.pivot(index = 'explained_factor', columns = 'scired_factor', values = 'fcat_value')
+        )
+        for col in cell_type:
+            if col not in adata.obs.columns or not (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object): continue
+            interpretability_metrics[f'homogeneity_{col}'] = sciRED.metrics.average_scaled_var(
+                y_varimax, covariate_vector = adata.obs[col].values, mean_type = 'arithmetic') # spelling is correct for this function
+        interpretability_metrics.to_csv(out_interpretability, sep = '\t', index = True, header = True)
 
     interpretability_metrics = interpretability_metrics.reset_index().melt(id_vars = 'index', var_name = 'metric', value_name = 'value')
     interpretability_metrics = interpretability_metrics.rename(columns = {'index': 'scired_factor'})
