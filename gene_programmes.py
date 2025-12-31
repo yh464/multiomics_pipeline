@@ -140,13 +140,13 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
     # factor importance scoring
     out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
-    loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0).T
-    factor_importance(loadings.values, adata, cell_type, out_fcat, out_fcat_fig)
+    factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
 
     # enrichment analysis
     out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
-    enrichr_res = factor_enrichr(usages, top_negative = False)
+    loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0).T
+    enrichr_res = factor_enrichr(loadings, top_negative = False)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
     
