@@ -29,7 +29,6 @@ def factor_enrichr(scores, top_negative = True):
         log.log(f'Enrichr analysis for factor {col}', calling_file = 'factor_enrichr')
         enrichr_res = enrichr_continuous(
             scores, by = col, top = 1000, top_negative = top_negative,
-            background = None,
             databases = [
                 'GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 
                 'KEGG_2021_Human', 'Reactome_2022', 'WikiPathways_2021_Human', 'Panther_2016', 'MSigDB_Hallmark_2020'
@@ -117,6 +116,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
     if not all([os.path.isfile(cnmf_obj.paths['merged_spectra'].replace(r'%d', str(k))) for k in n_components]) or args.force:
         cnmf_obj.combine()
     cnmf_obj.k_selection_plot()
+    os.rename(cnmf_obj.paths['k_selection_plot'], cnmf_obj.paths['k_selection_plot'].replace(
+        '.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}.png'))
     with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
         k_selection_stats = pd.DataFrame(**file)
     k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
