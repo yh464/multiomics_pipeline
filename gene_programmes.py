@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import os, time
 from fnmatch import fnmatch
 from multiprocessing import cpu_count
+from tqdm import tqdm
 from _utils.logger import logger
 log = logger()
 from _utils.path import project
@@ -130,7 +131,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
     os.makedirs(plot_dir, exist_ok = True)
     usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
-    for component in usages.columns:
+    for component in tqdm(usages.columns.tolist(), desc = 'Plotting cNMF cell-level scores in UMAP space'):
         if 'X_umap' not in adata.obsm.keys(): continue
         fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
         fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
@@ -139,12 +140,15 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
     # factor importance scoring
     out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
-    factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
+    loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0).T
+    factor_importance(loadings.values, adata, cell_type, out_fcat, out_fcat_fig)
+    log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
 
     # enrichment analysis
     out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
     enrichr_res = factor_enrichr(usages, top_negative = False)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
+    log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
     
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
@@ -289,21 +293,26 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         y_varimax_ = pd.DataFrame(y_varimax, index = adata.obs_names, columns = [f'F{i+1}' for i in range(y_varimax.shape[1])])
         loading_varimax_.to_csv(out_loading, sep = '\t', index = True, header = True)
         y_varimax_.to_csv(out_scores, sep = '\t', index = True, header = True)
+        log.log(f'scIRED gene-level weights saved to {out_loading}', calling_file = 'run_scired')
+        log.log(f'scIRED cell-level scores saved to {out_scores}', calling_file = 'run_scired')
 
     # plot UMAP scatterplot for all factors
     os.makedirs(f'{outdir}/plots', exist_ok = True)
-    for factor in y_varimax_.columns:
+    for factor in tqdm(y_varimax_.columns.tolist(), desc = 'Plotting scIRED cell-level scores in UMAP space'):
         if 'X_umap' not in adata.obsm.keys(): continue
         fig = scatterplot_adata(adata, v = y_varimax_[factor], rep = 'umap')
         fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
+    log.log(f'scIRED UMAP plots saved to {outdir}/plots', calling_file = 'run_scired')
 
     # FCAT analysis for factor importance
     fcat_mat = factor_importance(y_varimax, adata, cell_type, out_fcat, out_fcat_fig)
+    log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
 
     # enrichment analysis
     enrichr_res = factor_enrichr(y_varimax, top_negative = True)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
+    log.log(f'scIRED factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_scired')
 
     # correlation with n_umi
     corr_numi = sciRED.utils.corr.get_factor_libsize_correlation(y_varimax, adata.obs['n_umi'].values)
@@ -338,6 +347,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     fig = corr_heatmap(interpretability_metrics, sort = False)
     fig.savefig(out_interpretability_fig, bbox_inches = 'tight')
     plt.close(fig)
+    log.log(f'scIRED factor interpretability analysis saved to {out_interpretability} and {out_interpretability_fig}', calling_file = 'run_scired')
 
     proj.complete_step('programmes_scired', dataset, prefix)
     proj.complete_step('programmes_scired_scores', dataset, prefix)
