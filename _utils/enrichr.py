@@ -69,9 +69,9 @@ def get_genes_list(df, top = -1, by = None, top_negative = True,
     if top_negative and top > 0: genes_n = genes[-min(top, len(genes)):]
     else: genes_n = []
 
-    if isinstance(genes_p[0],list): genes_p = [g for l in genes_p for g in l]
-    if isinstance(genes_n[0],list): genes_n = [g for l in genes_n for g in l]
-    if isinstance(genes[0],list): genes = [g for l in genes_n for g in l]
+    if len(genes_p) > 0 and isinstance(genes_p[0],list): genes_p = [g for l in genes_p for g in l]
+    if len(genes_n) > 0 and isinstance(genes_n[0],list): genes_n = [g for l in genes_n for g in l]
+    if len(genes) > 0 and isinstance(genes[0],list): genes = [g for l in genes_n for g in l]
     
     # map genes to labels
     if genes_p[0].startswith('ENSG'):
