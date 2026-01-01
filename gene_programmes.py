@@ -24,11 +24,11 @@ from _plots.corr_heatmap import corr_heatmap
 from _plots.colourcode_scatterplot import scatterplot_adata
 from _utils.enrichr import enrichr_continuous
 
-def factor_enrichr(scores, top_negative = True):
+def factor_enrichr(scores, top_negative = True, top = 200):
     out = []
     for col in scores.columns:
         log.log(f'Enrichr analysis for factor {col}', calling_file = 'factor_enrichr')
-        enrichr_res = enrichr_continuous(scores, by = col, top = 1000, top_negative = top_negative, use_background = False)
+        enrichr_res = enrichr_continuous(scores, by = col, top = top, top_negative = top_negative, use_background = False)
         enrichr_res.insert(0, 'factor', col)
         out.append(enrichr_res)
     out = pd.concat(out, axis = 0)
@@ -233,7 +233,6 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
 
     import sciRED
     import sciRED.utils
-    import sciRED.ensembleFCA
     import statsmodels.api as sm
     from sklearn.preprocessing import StandardScaler
     from sklearn.decomposition import PCA
@@ -304,7 +303,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
 
     # enrichment analysis
-    enrichr_res = factor_enrichr(loading_varimax_, top_negative = True, top = 200)
+    enrichr_res = factor_enrichr(loading_varimax_, top_negative = True)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'scIRED factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_scired')
 
