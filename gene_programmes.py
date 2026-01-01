@@ -304,7 +304,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
 
     # enrichment analysis
-    enrichr_res = factor_enrichr(y_varimax_, top_negative = True)
+    enrichr_res = factor_enrichr(loading_varimax_, top_negative = True)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'scIRED factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_scired')
 
