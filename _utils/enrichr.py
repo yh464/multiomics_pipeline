@@ -108,11 +108,11 @@ def enrichr_continuous(df, top = -1, by = None, top_negative = True, databases =
     out = []
     out.append(enrichr_list(genes_lists[0], background = background, databases = databases).assign(sign = '+'))
     log.log('top positive genes:')
-    log.log(out[0].head(20))
+    print(out[0].head(20))
     if len(genes_lists) > 1:
         out.append(enrichr_list(genes_lists[1], background = background, databases = databases).assign(sign = '-'))
         log.log('top negative genes:')
-        log.log(out[1].head(20))
+        print(out[1].head(20))
     out = pd.concat(out)
     return out
 
