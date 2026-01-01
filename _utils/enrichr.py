@@ -101,18 +101,18 @@ def enrichr_list(genes, background = None, databases =
 
 def enrichr_continuous(df, top = -1, by = None, top_negative = True, databases =
     ['GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 'SynGO_2024'],
-    use_background = True
+    use_background = True, silent = False
     ):
     genes_lists, background = get_genes_list(df, top = top, by = by, top_negative = top_negative)
     if not use_background: background = None
     out = []
     out.append(enrichr_list(genes_lists[0], background = background, databases = databases).assign(sign = '+'))
-    log.log('top positive genes:')
-    print(out[0].head(20))
+    if not silent: log.log('top positive genes:')
+    if not silent: print(out[0].head(20))
     if len(genes_lists) > 1:
         out.append(enrichr_list(genes_lists[1], background = background, databases = databases).assign(sign = '-'))
-        log.log('top negative genes:')
-        print(out[1].head(20))
+        if not silent: log.log('top negative genes:')
+        if not silent: print(out[1].head(20))
     out = pd.concat(out)
     return out
 
