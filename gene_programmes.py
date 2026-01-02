@@ -48,8 +48,9 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
                 scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
             fcat_col['explained_factor'] = fcat_col.index
             fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
+            # the ensembleFCA function will automatically name the column as 'scired_factor' even if the input is not from sciRED
             fcat_col.insert(0, 'explained_group', col)
-            fcat_col.insert(2, 'xlabel', 'sciRED Factor')
+            fcat_col.insert(2, 'xlabel', 'factor')
             fcat_mat.append(fcat_col)
         else:
             log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'factor_importance', warning = True)
@@ -57,7 +58,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     fcat_mat = pd.concat(fcat_mat, axis = 0)
     fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].dropna().values)
     fcat_mat['significance'] = fcat_mat['fcat_value'] >= fcat_thr
-    fcat_mat.to_csv(out_tabular, sep = '\t', index = True, header = True)
+    fcat_mat.rename(columns={'scired_factor': 'factor'}).to_csv(out_tabular, sep = '\t', index = True, header = True)
     fig = corr_heatmap(fcat_mat, sort = False, sig_col = 'significance')
     fig.savefig(out_fig, bbox_inches = 'tight')
     plt.close(fig)
