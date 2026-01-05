@@ -193,3 +193,18 @@ def corr_heatmap(summary, sort = True, absmax = None, autocor = False, annot = '
                    frameon = False, loc = 'upper left', bbox_to_anchor=(right_pos+0.3/figsize[0], 0.4))
         
     return fig
+
+def corr_heatmap_wide_format(corr_mat, **kwargs):
+    '''
+    Docstring for corr_heatmap_wide_format
+    Converts a wide-format correlation matrix into long format and calls corr_heatmap.
+    '''
+    import pandas as pd
+    index_name = corr_mat.index.name if corr_mat.index.name is not None else ''
+    columns_name = corr_mat.columns.name if corr_mat.columns.name is not None else ''
+    corr_mat['index_tmp'] = corr_mat.index
+    long_format = corr_mat.melt(id_vars = 'index_tmp', var_name = 'columns_tmp', value_name = 'correlation').assign(
+        group1 = index_name, group2 = columns_name
+    )[['group1', 'index_tmp', 'group2', 'columns_tmp', 'correlation']]
+    fig = corr_heatmap(long_format, **kwargs)
+    return fig
