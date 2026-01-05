@@ -154,7 +154,7 @@ def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 1
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
     outdir = os.path.dirname(outdir)  # remove $prefix to get to the parent directory
     n_spectra_complete = 0
-    if not os.path.isdir(f'{outdir}/{prefix}/cnmf_tmp'): return False
+    if not os.path.isdir(f'{outdir}/{prefix}/cnmf_tmp'): os.makedirs(f'{outdir}/{prefix}/cnmf_tmp')
     for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
         for k in n_components:
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
