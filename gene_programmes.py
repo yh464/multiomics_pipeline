@@ -20,7 +20,7 @@ from _utils.logger import logger
 log = logger()
 from _utils.path import project
 proj = project()
-from _plots.corr_heatmap import corr_heatmap
+from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_adata
 from _utils.enrichr import enrichr_continuous
 
@@ -63,6 +63,17 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     fig.savefig(out_fig, bbox_inches = 'tight')
     plt.close(fig)
     return fcat_mat
+
+def factor_correlation(loadings, out_tabular, out_fig):
+    loadings.columns = [f'F{i+1}' for i in range(loadings.shape[1])]
+    corr_mat = loadings.corr()
+    log.log(f'Highest positive correlation between factors: {corr_mat.values.max():.4f}', calling_file = 'factor_correlation')
+    log.log(f'Highest negative correlation between factors: {corr_mat.values.min():.4f}', calling_file = 'factor_correlation')
+    corr_mat.to_csv(out_tabular, sep = '\t', index = True, header = True)
+    fig = corr_heatmap_wide_format(corr_mat)
+    fig.savefig(out_fig, bbox_inches = 'tight')
+    plt.close(fig)
+    return corr_mat
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_type = [],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100):
@@ -132,16 +143,19 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
         fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
         fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
-
+    
     # factor importance scoring
     out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
     factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
 
-    # enrichment analysis
+    # correlation and enrichment analysis
+    out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
+    out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
     out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
     loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0).T
+    factor_correlation(loadings, out_corr, out_corr_fig)
     enrichr_res = factor_enrichr(loadings, top_negative = False)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
@@ -230,6 +244,8 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     out_scores = f'{outdir}/{prefix}_scired_scores.txt'
     out_fcat = f'{outdir}/{prefix}_scired_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}_scired_fcat.pdf'
+    out_corr = f'{outdir}/{prefix}_scired_correlation.txt'
+    out_corr_fig = f'{outdir}/{prefix}_scired_correlation.pdf'
     out_interpretability = f'{outdir}/{prefix}_scired_interpretability.txt'
     out_interpretability_fig = f'{outdir}/{prefix}_scired_interpretability.pdf'
     out_enrichr = f'{outdir}/{prefix}_scired_enrichr.txt'
@@ -304,6 +320,9 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     # FCAT analysis for factor importance
     fcat_mat = factor_importance(y_varimax, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
+
+    # correlation analysis
+    factor_correlation(loading_varimax_, out_corr, out_corr_fig)
 
     # enrichment analysis
     enrichr_res = factor_enrichr(loading_varimax_, top_negative = True)
