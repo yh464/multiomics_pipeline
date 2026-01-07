@@ -121,8 +121,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
         return
     
     # combine iterations
-    if not all([os.path.isfile(cnmf_obj.paths['merged_spectra'].replace(r'%d', str(k))) for k in n_components]) or args.force:
-        cnmf_obj.combine()
+    cnmf_obj.combine()
     cnmf_obj.k_selection_plot()
     os.rename(cnmf_obj.paths['k_selection_plot'], cnmf_obj.paths['k_selection_plot'].replace(
         '.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}.png'))
