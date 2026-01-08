@@ -22,6 +22,7 @@ from _utils.path import project
 proj = project()
 from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_adata
+from _plots.regplot import temporal_regplot
 from _utils.enrichr import enrichr_continuous
 
 def factor_enrichr(scores, top_negative = True, top = 200):
@@ -74,6 +75,16 @@ def factor_correlation(loadings, out_tabular, out_fig):
     fig.savefig(out_fig, bbox_inches = 'tight')
     plt.close(fig)
     return corr_mat
+
+def factor_pseudotime_reg(scores, adata, out_fig, cell_type_key, pseudotime_key = 'pseudotime'):
+    os.makedirs(os.path.dirname(out_fig), exist_ok = True)
+    scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
+    score_cols = scores.columns.tolist()
+    scores = pd.concat([scores, adata.obs[[cell_type_key, pseudotime_key]]], axis = 1).dropna()
+    for col in tqdm(score_cols, desc = 'Plotting factor pseudotime regression'):
+        fig = temporal_regplot(scores, x = pseudotime_key, y = col, hue = cell_type_key)
+        fig.savefig(out_fig.replace('$factor', col), bbox_inches = 'tight')
+        plt.close(fig)
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_type = [],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100):
@@ -142,6 +153,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
         fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
         fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
+
+    # pseudotime regression plots
+    if len(cell_type) > 0 and 'pseudotime' in adata.obs.columns:
+        factor_pseudotime_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_pseudotime.png', cell_type[0])
     
     # factor importance scoring
     out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
@@ -316,6 +331,10 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         plt.close(fig)
     log.log(f'scIRED UMAP plots saved to {outdir}/plots', calling_file = 'run_scired')
 
+    # pseudotime regression plots
+    if len(cell_type) > 0 and 'pseudotime' in adata.obs.columns:
+        factor_pseudotime_reg(y_varimax, adata, f'{outdir}/plots/{prefix}_scired_$factor_pseudotime.png', cell_type[0])
+
     # FCAT analysis for factor importance
     fcat_mat = factor_importance(y_varimax, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
@@ -395,8 +414,9 @@ def add_cmd_args(parser):
     parser.add_argument('--spectra', action = 'store_true', help = 'Run Spectra to identify gene programmes')
     parser.add_argument('--cell_type', type = str, nargs = '+', default = ['Type_updated'],
         help = '''Categorical factors in adata.obs that denote the cell type. 
-        First argument is used for both Spectra and sciRED interpretability analysis, 
-        subsequent args only for sciRED (default: Type_updated)''')
+        Only the first is used for Spectra decomposition and pseudotime regression plots.
+        All factors are used for factor importance scoring
+        (default: Type_updated)''')
     parser.add_argument('-f','--force', action = 'store_true', help = 'Force overwrite')
     return parser
 
