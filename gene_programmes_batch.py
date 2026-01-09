@@ -17,7 +17,7 @@ from _utils.slurm import array_submitter, add_slurm_args_dec
 from gene_programmes import check_cnmf_completed
 
 def main(args):
-    cnmf_submitter = array_submitter(name = 'cnmf_batch_' + '_'.join(args.datasets),
+    cnmf_submitter = array_submitter(name = 'cnmf_batch_' + '_'.join(args.datasets)+'_'+str(args.cnmf_components),
         partition = 'icelake-himem', n_cpu = 4, timeout = 120)
     scired_submitter = array_submitter(name = 'scired_batch_' + '_'.join(args.datasets),
         partition = 'sapphire', n_cpu = 32, timeout = 720)

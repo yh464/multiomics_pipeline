@@ -133,13 +133,17 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
     
     # combine iterations
     cnmf_obj.combine()
-    cnmf_obj.k_selection_plot()
-    os.rename(cnmf_obj.paths['k_selection_plot'], cnmf_obj.paths['k_selection_plot'].replace(
-        '.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}.png'))
-    with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
-        k_selection_stats = pd.DataFrame(**file)
-    k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
-    log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
+    if len(n_components) > 1:
+        cnmf_obj.k_selection_plot()
+        os.rename(cnmf_obj.paths['k_selection_plot'], cnmf_obj.paths['k_selection_plot'].replace(
+            '.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}.png'))
+        with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
+            k_selection_stats = pd.DataFrame(**file)
+        k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
+        log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
+    else: 
+        k_optim = n_components[0]
+        log.log(f'Proceeding with k = {k_optim} for downstream analysis', calling_file = 'run_cnmf')
 
     # consensus factor decomposition
     if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01')) or args.force:
