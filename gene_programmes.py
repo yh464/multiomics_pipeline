@@ -90,7 +90,7 @@ def factor_pseudotime_reg(scores, adata, out_fig, cell_type_key, pseudotime_key 
         fig.savefig(out_fig.replace('$factor', col), bbox_inches = 'tight')
         plt.close(fig)
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_type = [],
+def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_threshold = 0.1, cell_type = [],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
@@ -125,9 +125,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
         else: time.sleep(10)
     
     # run NMF iterations
-    if not force: skip_completed = True
-    else: skip_completed = False
-    cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = skip_completed)
+    cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
     n_spectra_complete = 0
     for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
         for k in n_components:
@@ -154,11 +152,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
         log.log(f'Proceeding with k = {k_optim} for downstream analysis', calling_file = 'run_cnmf')
 
     # consensus factor decomposition
-    if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01')) or args.force:
-        cnmf_obj.consensus(k = k_optim, density_threshold = 0.01)
+    density_threshold_str = str(density_threshold).replace('.','_')
+    if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str)) or args.force:
+        cnmf_obj.consensus(k = k_optim, density_threshold = density_threshold)
     plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
     os.makedirs(plot_dir, exist_ok = True)
-    usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0)
+    usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
     for component in tqdm(usages.columns.tolist(), desc = 'Plotting cNMF cell-level scores in UMAP space'):
         if 'X_umap' not in adata.obsm.keys(): continue
@@ -403,7 +402,7 @@ def main(args):
     scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     spectra_outdir = os.path.dirname(proj.config['programmes_spectra']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
-        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, 
+        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
             cell_type = args.cell_type, force = args.force, worker_id = args.worker)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
@@ -416,6 +415,8 @@ def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
     parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 70, 10),
         help = 'Number of components to identify for cNMF (start, stop, step), default: 10 70 10')
+    parser.add_argument('--cnmf_dt', type = float, default = 0.1,
+        help = 'Density threshold for cNMF consensus spectra (default: 0.1)')
     parser.add_argument('--scired', action = 'store_true', help = 'Run scIRED to identify gene programmes')
     parser.add_argument('--scired_components', type = int, default = 50,
         help = 'Number of components to identify for scIRED (default: 50)')
