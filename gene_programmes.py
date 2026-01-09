@@ -179,7 +179,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
     out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
     out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
-    loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', '0_01'), index_col = 0).T
+    loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0).T
     factor_correlation(loadings, out_corr, out_corr_fig)
     enrichr_res = factor_enrichr(loadings, top_negative = False)
     enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
