@@ -66,7 +66,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     return fcat_mat
 
 def factor_correlation(loadings, out_tabular, out_fig):
-    from scipy.clustering.hierarchy import linkage, dendrogram
+    from scipy.cluster.hierarchy import linkage, dendrogram
     loadings.columns = [f'F{i+1}' for i in range(loadings.shape[1])]
     linkage_matrix = linkage(loadings.T, method = 'average', metric = 'correlation')
     dendrogram_res = dendrogram(linkage_matrix, no_plot = True)
