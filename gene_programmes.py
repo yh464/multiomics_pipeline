@@ -66,7 +66,11 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     return fcat_mat
 
 def factor_correlation(loadings, out_tabular, out_fig):
+    from scipy.clustering.hierarchy import linkage, dendrogram
     loadings.columns = [f'F{i+1}' for i in range(loadings.shape[1])]
+    linkage_matrix = linkage(loadings.T, method = 'average', metric = 'correlation')
+    dendrogram_res = dendrogram(linkage_matrix, no_plot = True)
+    loadings = loadings.iloc[:, dendrogram_res['leaves']]
     corr_mat = loadings.corr()
     log.log(f'Highest positive correlation between factors: {corr_mat.values.max():.4f}', calling_file = 'factor_correlation')
     log.log(f'Highest negative correlation between factors: {corr_mat.values.min():.4f}', calling_file = 'factor_correlation')

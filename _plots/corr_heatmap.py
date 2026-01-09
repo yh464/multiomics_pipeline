@@ -206,5 +206,6 @@ def corr_heatmap_wide_format(corr_mat, **kwargs):
     long_format = corr_mat.melt(id_vars = 'index_tmp', var_name = 'columns_tmp', value_name = 'correlation').assign(
         group1 = index_name, group2 = columns_name
     )[['group1', 'index_tmp', 'group2', 'columns_tmp', 'correlation']]
+    kwargs |= {'sort': False}
     fig = corr_heatmap(long_format, **kwargs)
     return fig
