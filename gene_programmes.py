@@ -110,12 +110,14 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), cell_typ
 
     # check progress and preprocess data
     if worker_id == 0: 
+        log.log('Setting cNMF runtime parameters', calling_file = 'run_cnmf')
         replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
             ks = n_components, n_iter = n_iter, random_state_seed = seed,
             beta_loss = 'frobenius', init = 'random', alpha_usage = 0.0, alpha_spectra = 0.0, max_iter = 1000
         )
         cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
         cnmf_obj.update_nmf_iter_params()
+        log.log('Saved cNMF runtime parameters', calling_file = 'run_cnmf')
     else: time.sleep(5)
     while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
         if worker_id == 0: # prevent other workers from simultaneously writing files
