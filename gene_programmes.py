@@ -72,8 +72,10 @@ def factor_correlation(loadings, out_tabular, out_fig):
     dendrogram_res = dendrogram(linkage_matrix, no_plot = True)
     loadings = loadings.iloc[:, dendrogram_res['leaves']]
     corr_mat = loadings.corr()
+    for i in corr_mat.index: corr_mat.loc[i,i] = 0
     log.log(f'Highest positive correlation between factors: {corr_mat.values.max():.4f}', calling_file = 'factor_correlation')
     log.log(f'Highest negative correlation between factors: {corr_mat.values.min():.4f}', calling_file = 'factor_correlation')
+    for i in corr_mat.index: corr_mat.loc[i,i] = 1
     corr_mat.to_csv(out_tabular, sep = '\t', index = True, header = True)
     fig = corr_heatmap_wide_format(corr_mat)
     fig.savefig(out_fig, bbox_inches = 'tight')
