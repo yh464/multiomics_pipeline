@@ -111,6 +111,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
 
     # check progress and preprocess data
+    while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
+        if worker_id == 0: # prevent other workers from simultaneously writing files
+            cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
+        else: time.sleep(10)
     if worker_id == 0: 
         log.log('Setting cNMF runtime parameters', calling_file = 'run_cnmf')
         replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
@@ -121,10 +125,6 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         cnmf_obj.update_nmf_iter_params()
         log.log('Saved cNMF runtime parameters', calling_file = 'run_cnmf')
     else: time.sleep(5)
-    while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
-        if worker_id == 0: # prevent other workers from simultaneously writing files
-            cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
-        else: time.sleep(10)
     
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
