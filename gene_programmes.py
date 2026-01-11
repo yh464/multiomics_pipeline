@@ -7,8 +7,7 @@ Version 1: 2025-12-21
 Pipelines to identify gene expression programmes from scRNA-seq data
 '''
 
-import anndata
-import scanpy as sc
+# scanpy takes long to import so needs to be imported in each sub-function
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -100,7 +99,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     n_components: number of components to identify
     random_state: random seed
     '''
-
+    import scanpy as sc
     h5ad_raw = proj.to_pathname('raw', dataset, prefix)
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
 
@@ -209,7 +208,7 @@ def run_spectra(dataset, prefix, outdir, cell_type):
     outdir: output directory
     n_components will be estimated from data
     '''
-    
+    import scanpy as sc    
     h5ad_raw = proj.to_pathname('raw', dataset, prefix)
     adata = sc.read_h5ad(h5ad_raw)
     adata.X = adata.X.log1p() # convert to log counts
@@ -261,6 +260,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     n_components: number of components to identify
     random_state: random seed
     '''
+    import scanpy as sc
     h5ad_raw = proj.to_pathname('raw', dataset, prefix)
     adata = sc.read_h5ad(h5ad_raw)
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
