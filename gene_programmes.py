@@ -24,14 +24,16 @@ from _plots.colourcode_scatterplot import scatterplot_adata
 from _plots.regplot import temporal_regplot
 from _utils.enrichr import enrichr_continuous
 
-def factor_enrichr(scores, top_negative = True, top = 200):
+def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
     out = []
     for col in scores.columns:
-        log.log(f'Enrichr analysis for factor {col}', calling_file = 'factor_enrichr')
-        enrichr_res = enrichr_continuous(scores, by = col, top = top, top_negative = top_negative, 
-            use_background = False, silent = True)
-        enrichr_res.insert(0, 'factor', col)
-        out.append(enrichr_res)
+        for t in top:
+            log.log(f'Enrichr analysis for factor {col} on top {t} genes', calling_file = 'factor_enrichr')
+            enrichr_res = enrichr_continuous(scores, by = col, top = t, top_negative = top_negative, 
+                use_background = False, silent = True)
+            enrichr_res.insert(0, 'factor', col)
+            enrichr_res['top'] = t
+            out.append(enrichr_res)
     out = pd.concat(out, axis = 0)
     return out
 
