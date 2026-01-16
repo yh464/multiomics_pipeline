@@ -1,5 +1,5 @@
 import os, sys
-sys.path.insert(0,'/rds/project/rb643/rds-rb643-ukbiobank2/Data_Users/yh464/scripts')
+sys.path.insert(0,'/home/yh464/rds/rds-rb643-ukbiobank2/Data_Users/yh464/scripts')
 from _utils.slurm import array_submitter
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
