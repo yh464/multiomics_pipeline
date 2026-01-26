@@ -85,12 +85,17 @@ def factor_correlation(loadings, out_tabular, out_fig):
 
 def factor_pseudotime_reg(scores, adata, out_fig, cell_type_key, pseudotime_key = 'pseudotime'):
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
+    if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
+        out_fig += '.png'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     scores = pd.concat([scores, adata.obs[[cell_type_key, pseudotime_key]]], axis = 1).dropna()
     for col in tqdm(score_cols, desc = 'Plotting factor pseudotime regression'):
         fig = temporal_regplot(scores, x = pseudotime_key, y = col, hue = cell_type_key)
-        fig.savefig(out_fig.replace('$factor', col), bbox_inches = 'tight')
+        fig.savefig(out_fig.replace('$factor', col), bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
+        fig = temporal_regplot(scores, x = pseudotime_key, y = col, hue = cell_type_key, order = 2)
+        fig.savefig(out_fig.replace('$factor', col).replace('.png', '_order2.png'), bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_threshold = 0.1, cell_type = [],

@@ -42,6 +42,16 @@ def main(args):
             f'--scired_covars {" ".join(args.scired_covars)} --cell_type {" ".join(args.cell_type)}'
         if args.force: cmd += ' --force'
         if args.cnmf:
+            h5ad_raw = proj.to_pathname('raw', dataset, prefix)
+            outdir = os.path.realpath(cnmf_outdir).replace('$dataset', dataset).replace('$prefix', prefix)
+            import cnmf
+            cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
+            if not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
+                log.log(f'Preparing cNMF normalised count files for {dataset}/{prefix}')
+                cnmf_obj.prepare(counts_fn = h5ad_raw, 
+                    components = range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]), 
+                    n_iter = 100, seed = 19260817)
+            else: log.log(f'cNMF normalised count file for {dataset}/{prefix} found at {cnmf_obj.paths["normalized_counts"]}')
             cnmf_complete = check_cnmf_completed(dataset, prefix, cnmf_outdir, 
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]))
             n_jobs = 1 if cnmf_complete else 100
