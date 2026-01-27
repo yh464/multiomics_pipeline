@@ -153,6 +153,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         # PCA scree plot
         adata = sc.read_h5ad(cnmf_obj.paths['normalized_counts'], 'r')
         if not 'pca' in adata.uns.keys() or adata.uns['pca']['variance_ratio'].size < max(n_components):
+            adata = adata.to_memory()
             sc.pp.pca(adata, n_comps = max(n_components)+10)
             sc.write_h5ad(adata, cnmf_obj.paths['normalized_counts'])
         total_variance_explained = np.cumsum(adata.uns['pca']['variance_ratio'])
