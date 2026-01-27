@@ -144,11 +144,35 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
     
+    # FOLLOWING ANALYSES ARE ONLY CONDUCTED AFTER ALL WORKERS HAVE COMPLETED NMF ITERATIONS
     # combine iterations
     for k in n_components:
         if os.path.isfile(cnmf_obj.paths['merged_spectra'] % k) and not force: continue
         cnmf_obj.combine_nmf(k)
     if len(n_components) > 1:
+        # PCA scree plot
+        adata = sc.read_h5ad(cnmf_obj.paths['normalized_counts'], 'r')
+        if not 'pca' in adata.uns.keys() or adata.uns['pca']['variance_ratio'].size < max(n_components):
+            sc.pp.pca(adata, n_comps = max(n_components)+10)
+            sc.write_h5ad(adata, cnmf_obj.paths['normalized_counts'])
+        total_variance_explained = np.cumsum(adata.uns['pca']['variance_ratio'])
+        fig, ax = plt.subplots(figsize = (5, 3))
+        ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), adata.uns['pca']['variance_ratio'], color = 'k')
+        ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), total_variance_explained, color = 'r')
+        ax.set_title('PCA Scree Plot')
+        ax.set_xlabel('Principal Component')
+        ax.set_ylabel('Variance Explained')
+        fig.savefig(f'{outdir}/{prefix}/{prefix}_cnmf_k{total_variance_explained.size}_screeplot.pdf', bbox_inches = 'tight')
+        plt.close(fig)
+        log.log(f'PCA scree plot saved to {outdir}/{prefix}/{prefix}_cnmf_k{total_variance_explained.size}_screeplot.pdf', calling_file = 'run_cnmf')
+        total_0_7_variance = np.where(total_variance_explained >= 0.7)[0][0] + 1
+        total_0_8_variance = np.where(total_variance_explained >= 0.8)[0][0] + 1
+        total_0_9_variance = np.where(total_variance_explained >= 0.9)[0][0] + 1
+        log.log(f'Number of PCs to explain 70% variance: {total_0_7_variance}', calling_file = 'run_cnmf')
+        log.log(f'Number of PCs to explain 80% variance: {total_0_8_variance}', calling_file = 'run_cnmf')
+        log.log(f'Number of PCs to explain 90% variance: {total_0_9_variance}', calling_file = 'run_cnmf')
+
+        # error/stability plot
         cnmf_obj.k_selection_plot()
         os.rename(cnmf_obj.paths['k_selection_plot'], cnmf_obj.paths['k_selection_plot'].replace(
             '.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}.png'))
