@@ -159,19 +159,19 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         total_variance_explained = np.cumsum(adata.uns['pca']['variance_ratio'])
         fig, ax = plt.subplots(figsize = (5, 3))
         ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), adata.uns['pca']['variance_ratio'], color = 'k')
-        ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), total_variance_explained, color = 'r')
+        ax1 = ax.twinx()
+        ax1.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), total_variance_explained, color = 'r')
         ax.set_title('PCA Scree Plot')
         ax.set_xlabel('Principal Component')
         ax.set_ylabel('Variance Explained')
         fig.savefig(f'{outdir}/{prefix}/{prefix}_cnmf_k{total_variance_explained.size}_screeplot.pdf', bbox_inches = 'tight')
         plt.close(fig)
         log.log(f'PCA scree plot saved to {outdir}/{prefix}/{prefix}_cnmf_k{total_variance_explained.size}_screeplot.pdf', calling_file = 'run_cnmf')
-        total_0_7_variance = np.where(total_variance_explained >= 0.7)[0][0] + 1
-        total_0_8_variance = np.where(total_variance_explained >= 0.8)[0][0] + 1
-        total_0_9_variance = np.where(total_variance_explained >= 0.9)[0][0] + 1
-        log.log(f'Number of PCs to explain 70% variance: {total_0_7_variance}', calling_file = 'run_cnmf')
-        log.log(f'Number of PCs to explain 80% variance: {total_0_8_variance}', calling_file = 'run_cnmf')
-        log.log(f'Number of PCs to explain 90% variance: {total_0_9_variance}', calling_file = 'run_cnmf')
+        log.log(f'{(adata.uns["pca"]["variance_ratio"] > 0.05).sum()} PCs explain more than 5% variance', calling_file = 'run_cnmf')
+        log.log(f'{(adata.uns["pca"]["variance_ratio"] > 0.01).sum()} PCs explain more than 1% variance', calling_file = 'run_cnmf')
+        log.log('First 10 PCs:', calling_file = 'run_cnmf')
+        for i in range(10):
+            log.log(f'    PC{i+1}: {adata.uns["pca"]["variance_ratio"][i]*100:.2f}%', calling_file = 'run_cnmf')
 
         # error/stability plot
         cnmf_obj.k_selection_plot()
