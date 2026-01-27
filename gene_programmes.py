@@ -117,7 +117,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
 
     # check progress and preprocess data
-    while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']):
+    while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']) or \
+        not os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) or not os.access(cnmf_obj.paths['tpm'], os.R_OK):
         if worker_id == 0: # prevent other workers from simultaneously writing files
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
         else: time.sleep(10)
