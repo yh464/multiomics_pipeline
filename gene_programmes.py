@@ -99,7 +99,7 @@ def factor_pseudotime_reg(scores, adata, out_fig, cell_type_key, pseudotime_key 
         plt.close(fig)
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_threshold = 0.1, cell_type = [],
-    seed = 19260817, force = False, worker_id = 0, n_iter = 100):
+    seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
     outdir: output directory
@@ -222,6 +222,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
 
+    if savedir is not None:
+        os.makedirs(savedir, exist_ok = True)
+        loadings.index.name = 'gene'
+        loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
+        loadings.to_csv(f'{savedir}/{prefix}.cnmf_k{k_optim}.txt', sep = '\t', index = True, header = True)
+
 def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 10), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
@@ -285,7 +291,7 @@ def run_spectra(dataset, prefix, outdir, cell_type):
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
     covar_cols = [], cell_type = [],           
-    seed = 19260817, force = False):
+    seed = 19260817, force = False, savedir = None):
     '''
     run consensus NMF on input h5ad file
     h5ad: input h5ad file path or AnnData object, RAW COUNTS
@@ -431,6 +437,12 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     proj.complete_step('programmes_scired', dataset, prefix)
     proj.complete_step('programmes_scired_scores', dataset, prefix)
 
+    if savedir is not None:
+        os.makedirs(savedir, exist_ok = True)
+        loading_varimax_.index.name = 'gene'
+        loading_varimax_.columns = [f'{prefix}.scired.F{i+1}' for i in range(loading_varimax_.shape[1])]
+        loading_varimax_.to_csv(f'{savedir}/{prefix}.scired.txt', sep = '\t', index = True, header = True)
+
 def main(args):
     cnmf_outdir = os.path.dirname(os.path.dirname(proj.config['programmes_cnmf'])).replace(
         '$dataset', args.dataset).replace('$prefix', args.prefix) # cNMF automatically creates the $prefix subdirectory
@@ -438,13 +450,13 @@ def main(args):
     spectra_outdir = os.path.dirname(proj.config['programmes_spectra']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
-            cell_type = args.cell_type, force = args.force, worker_id = args.worker)
+            cell_type = args.cell_type, force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
             n_genes = args.scired_genes, covar_cols = args.scired_covars,
-            cell_type = args.cell_type, force = args.force)
+            cell_type = args.cell_type, force = args.force, savedir = args.magma_out if args.magma else None)
     if args.spectra:
-        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0])
+        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0], savedir = args.magma_out if args.magma else None)
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
@@ -465,6 +477,8 @@ def add_cmd_args(parser):
         Only the first is used for Spectra decomposition and pseudotime regression plots.
         All factors are used for factor importance scoring
         (default: Type_updated)''')
+    parser.add_argument('--magma', action = 'store_true', help = 'Format output for MAGMA GSEA')
+    parser.add_argument('--magma_out', default = '../gene_score', help = 'Output directory for MAGMA formatted gene weights (default: ../gene_score)')
     parser.add_argument('-f','--force', action = 'store_true', help = 'Force overwrite')
     return parser
 
