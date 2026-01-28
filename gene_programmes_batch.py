@@ -41,6 +41,7 @@ def main(args):
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} '+ \
             f'--scired_covars {" ".join(args.scired_covars)} --cell_type {" ".join(args.cell_type)}'
         if args.force: cmd += ' --force'
+        if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
             cnmf_complete = check_cnmf_completed(dataset, prefix, cnmf_outdir, 
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]))
