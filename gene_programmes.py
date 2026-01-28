@@ -187,17 +187,18 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
 
     # consensus factor decomposition
     density_threshold_str = str(density_threshold).replace('.','_')
-    if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str)) or args.force:
+    if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str)) or force:
         cnmf_obj.consensus(k = k_optim, density_threshold = density_threshold)
     plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
     os.makedirs(plot_dir, exist_ok = True)
-    usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
-    adata = sc.read_h5ad(h5ad_raw, 'r')
-    for component in tqdm(usages.columns.tolist(), desc = 'Plotting cNMF cell-level scores in UMAP space'):
-        if 'X_umap' not in adata.obsm.keys(): continue
-        fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
-        fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
-        plt.close(fig)
+    if not all([os.path.isfile(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png') for component in range(1, k_optim+1)]) or force:
+        usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
+        adata = sc.read_h5ad(h5ad_raw, 'r')
+        for component in tqdm(usages.columns.tolist(), desc = 'Plotting cNMF cell-level scores in UMAP space'):
+            if 'X_umap' not in adata.obsm.keys(): continue
+            fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
+            fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
+            plt.close(fig)
 
     # pseudotime regression plots
     if len(cell_type) > 0 and 'pseudotime' in adata.obs.columns:
@@ -206,7 +207,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     # factor importance scoring
     out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
-    factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
+    if not os.path.isfile(out_fcat) or force:
+        factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
 
     # correlation and enrichment analysis
@@ -214,9 +216,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
     out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
     loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0).T
-    factor_correlation(loadings, out_corr, out_corr_fig)
-    enrichr_res = factor_enrichr(loadings, top_negative = False)
-    enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
+    if not os.path.isfile(out_corr) or force: factor_correlation(loadings, out_corr, out_corr_fig)
+    if not os.path.isfile(out_enrichr) or force:
+        enrichr_res = factor_enrichr(loadings, top_negative = False)
+        enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
     
     proj.complete_step('programmes_cnmf', dataset, prefix)
