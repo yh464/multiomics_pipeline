@@ -117,11 +117,16 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
 
     # check progress and preprocess data
+    tic = time.perf_counter()
     while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']) or \
         not os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) or not os.access(cnmf_obj.paths['tpm'], os.R_OK):
         if worker_id == 0: # prevent other workers from simultaneously writing files
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
-        else: time.sleep(10)
+        else: 
+            time.sleep(10)
+            if time.perf_counter() - tic > 600:
+                log.warn('Waiting too long for normalised count file to be generated', calling_file = 'run_cnmf')
+                return
     if worker_id == 0: 
         log.log('Setting cNMF runtime parameters', calling_file = 'run_cnmf')
         replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
@@ -131,7 +136,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
         cnmf_obj.update_nmf_iter_params()
         log.log('Saved cNMF runtime parameters', calling_file = 'run_cnmf')
-    else: time.sleep(5)
+    else: time.sleep(5) # this step is fast enough, no time limit needed
     
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
