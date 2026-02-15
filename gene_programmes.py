@@ -160,9 +160,9 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         if not 'pca' in adata.uns.keys() or adata.uns['pca']['variance_ratio'].size < max(n_components):
             adata = adata.to_memory()
             sc.pp.pca(adata, n_comps = max(n_components)+10)
-            sc.write(cnmf_obj.paths['normalized_counts'].replace('.adata','.pca.adata'), adata) # prevent old file from being overwritten
+            sc.write(cnmf_obj.paths['normalized_counts'].replace('.h5ad','.pca.h5ad'), adata) # prevent old file from being overwritten
             os.remove(cnmf_obj.paths['normalized_counts'])
-            os.rename(cnmf_obj.paths['normalized_counts'].replace('.adata','.pca.adata'), cnmf_obj.paths['normalized_counts'])
+            os.rename(cnmf_obj.paths['normalized_counts'].replace('.h5ad','.pca.h5ad'), cnmf_obj.paths['normalized_counts'])
         total_variance_explained = np.cumsum(adata.uns['pca']['variance_ratio'])
         fig, ax = plt.subplots(figsize = (5, 3))
         ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), adata.uns['pca']['variance_ratio'], color = 'k')
@@ -453,6 +453,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         loading_varimax_.columns = [f'{prefix}.scired.F{i+1}' for i in range(loading_varimax_.shape[1])]
         loading_varimax_.to_csv(f'{savedir}/{prefix}.scired.txt', sep = '\t', index = True, header = True)
 
+@log.profile
 def main(args):
     cnmf_outdir = os.path.dirname(os.path.dirname(proj.config['programmes_cnmf'])).replace(
         '$dataset', args.dataset).replace('$prefix', args.prefix) # cNMF automatically creates the $prefix subdirectory
