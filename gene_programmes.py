@@ -160,7 +160,9 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         if not 'pca' in adata.uns.keys() or adata.uns['pca']['variance_ratio'].size < max(n_components):
             adata = adata.to_memory()
             sc.pp.pca(adata, n_comps = max(n_components)+10)
-            sc.write(cnmf_obj.paths['normalized_counts'], adata)
+            sc.write(cnmf_obj.paths['normalized_counts'].replace('.adata','.pca.adata'), adata) # prevent old file from being overwritten
+            os.remove(cnmf_obj.paths['normalized_counts'])
+            os.rename(cnmf_obj.paths['normalized_counts'].replace('.adata','.pca.adata'), cnmf_obj.paths['normalized_counts'])
         total_variance_explained = np.cumsum(adata.uns['pca']['variance_ratio'])
         fig, ax = plt.subplots(figsize = (5, 3))
         ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), adata.uns['pca']['variance_ratio'], color = 'k')
