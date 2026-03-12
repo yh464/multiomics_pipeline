@@ -156,13 +156,7 @@ class project():
 
     def to_pathname_multi(self, ftype, *datasets):
         datasets = self._to_long_format(*datasets)
-        out = []
-        for dataset, prefix in datasets:
-            if ftype not in self.config:
-                raise ValueError(f'File type {ftype} not found in path config')
-            pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
-            out.append(pattern)
-        return out
+        return [self.to_pathname(ftype, dataset, prefix) for dataset, prefix in datasets]
 
     def register(self, ftype, pattern, force = False):
         pattern = os.path.realpath(pattern)
@@ -170,6 +164,8 @@ class project():
             raise ValueError(f'File type {ftype} already exists in path config. Use force = True to overwrite.')
         if '$dataset' not in pattern or '$prefix' not in pattern:
             raise ValueError('Pattern must contain $dataset and $prefix placeholders.')
+        if not os.path.dirname(pattern).startswith(self.project_root):
+            raise ValueError('Pattern must be within the project root directory.')
         self.config[ftype] = pattern
         self.progress[ftype] = False
         self.save()
