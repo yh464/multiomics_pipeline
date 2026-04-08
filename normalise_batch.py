@@ -19,8 +19,7 @@ def main(args):
     submitter = array_submitter(name = 'normalise_batch_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 16, timeout = 720)
     # no need to register 'normalised' as that is specified in _utils.path.project as a default path
-    scdrs_outdir = os.path.realpath(f'{proj.project_root}/scdrs/$dataset/$prefix')
-    os.makedirs(f'{proj.project_root}/scdrs', exist_ok = True)
+    scdrs_outdir = 'scdrs/$dataset/$prefix'
     proj.register('scdrs', f'{scdrs_outdir}/$prefix.h5ad')
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)

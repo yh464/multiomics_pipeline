@@ -25,13 +25,13 @@ def main(args):
         partition = 'sapphire', n_cpu = 16, timeout = 720)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
-    cnmf_outdir = os.path.realpath(f'{proj.project_root}/programmes/cnmf/$dataset/$prefix')
+    cnmf_outdir = 'programmes/cnmf/$dataset/$prefix'
     proj.register('programmes_cnmf',f'{cnmf_outdir}/$prefix.gene_spectra_score.k_*.dt_*.consensus.txt')
     proj.register('programmes_cnmf_scores',f'{cnmf_outdir}/$prefix.usages.k_*.dt_*.consensus.txt')
-    scired_outdir = os.path.realpath(f'{proj.project_root}/programmes/scired/$dataset/$prefix')
+    scired_outdir = 'programmes/scired/$dataset/$prefix'
     proj.register('programmes_scired',f'{scired_outdir}/$prefix_scired_loadings.txt')
     proj.register('programmes_scired_scores',f'{scired_outdir}/$prefix_scired_scores.txt')
-    spectra_outdir = os.path.realpath(f'{proj.project_root}/programmes/spectra/$dataset/$prefix')
+    spectra_outdir = 'programmes/spectra/$dataset/$prefix'
     proj.register('programmes_spectra',f'{spectra_outdir}/$prefix_spectra_loadings.txt')
     proj.register('programmes_spectra_scores',f'{spectra_outdir}/$prefix_spectra_scores.txt')
     cnmf_components_str = ' '.join([str(x) for x in args.cnmf_components])

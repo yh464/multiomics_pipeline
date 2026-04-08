@@ -23,8 +23,8 @@ class project():
         self.config_file = f'{self.project_root}/.path/path_config.json'
         if not os.path.isfile(self.config_file):
             self.config = {
-                'raw': f'{self.project_root}/raw/$dataset/$prefix.h5ad', # raw data directory will be scanned
-                'normalised': f'{self.project_root}/normalised/$dataset/$prefix.h5ad', # normalised data will also be scanned
+                'raw': 'raw/$dataset/$prefix.h5ad', # raw data directory will be scanned
+                'normalised': 'normalised/$dataset/$prefix.h5ad', # normalised data will also be scanned
             }
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent = 4)
@@ -49,7 +49,7 @@ class project():
 
     def scan_h5ad(self): # special function to scan for original and normalised h5ad files
         raw_list = []
-        raw_pattern = self.config['raw'].replace('$dataset','*').replace('$prefix','*')
+        raw_pattern = f'{self.project_root}/' + self.config['raw'].replace('$dataset','*').replace('$prefix','*')
         for dataset in os.listdir(f'{self.project_root}/raw'):
             if not os.path.isdir(f'{self.project_root}/raw/{dataset}'): continue
             for prefix in os.listdir(f'{self.project_root}/raw/{dataset}'):
@@ -58,7 +58,7 @@ class project():
                     raw_list.append((dataset, prefix.replace('.h5ad','').replace('.gz',''))) # (dataset, prefix) tuple
 
         norm_list = []
-        norm_pattern = self.config['normalised'].replace('$dataset','*').replace('$prefix','*')
+        norm_pattern = f'{self.project_root}/' + self.config['normalised'].replace('$dataset','*').replace('$prefix','*')
         for dataset in os.listdir(f'{self.project_root}/normalised'):
             if not os.path.isdir(f'{self.project_root}/normalised/{dataset}'): continue
             for prefix in os.listdir(f'{self.project_root}/normalised/{dataset}'):
@@ -79,7 +79,7 @@ class project():
         other_files.remove('raw'); other_files.remove('normalised')
         for dataset, prefix in out_df.index:
             for ftype in other_files:
-                pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+                pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
                 if os.path.exists(pattern):
                     out_df.loc[(dataset, prefix), ftype] = True
                 elif os.path.exists(os.path.dirname(pattern)) and \
@@ -128,7 +128,7 @@ class project():
             datasets = [(x, z) for x,y in datasets[0] for z in y] # coerse into long format
         elif isinstance(datasets[0][0], tuple):
             datasets = datasets[0] # already in long format
-        else: raise ValueError('Unrecognised input dataset names')
+        else: log.error('Unrecognised input dataset names')
         return datasets
     
     def find(self, ftype, *datasets):
@@ -137,8 +137,8 @@ class project():
         out = []
         for dataset, prefix in datasets:
             if ftype not in self.config:
-                raise ValueError(f'File type {ftype} not found in path config')
-            pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+                log.error(f'File type {ftype} not found in path config')
+            pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
             out.append(os.path.isfile(pattern))
             self.progress.loc[(dataset, prefix), ftype] = out[-1]
         log.log(f'Found {sum(out)} / {len(out)} files for processing step {ftype}', calling_file = 'path/find')
@@ -150,8 +150,9 @@ class project():
     
     def to_pathname(self, ftype, dataset, prefix):
         if ftype not in self.config:
-            raise ValueError(f'File type {ftype} not found in path config')
-        pattern = self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+            log.error(f'File type {ftype} not found in path config')
+        pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+        os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
         return pattern
 
     def to_pathname_multi(self, ftype, *datasets):
@@ -159,13 +160,16 @@ class project():
         return [self.to_pathname(ftype, dataset, prefix) for dataset, prefix in datasets]
 
     def register(self, ftype, pattern, force = False):
-        pattern = os.path.realpath(pattern)
+        # pattern should be relative to the project root
+        if pattern.startswith('/'):
+            pattern = os.path.realpath(pattern)
+            if not pattern.startswith(self.project_root):
+                log.error('Provided absolute path is outside the project root directory.', calling_file = 'path/register')
+            else: pattern = pattern.replace(f'{self.project_root}/', '')
         if ftype in self.config and pattern != self.config[ftype] and not force:
-            raise ValueError(f'File type {ftype} already exists in path config. Use force = True to overwrite.')
+            log.error(f'File type {ftype} already exists in path config. Use force = True to overwrite.')
         if '$dataset' not in pattern or '$prefix' not in pattern:
-            raise ValueError('Pattern must contain $dataset and $prefix placeholders.')
-        if not os.path.dirname(pattern).startswith(self.project_root):
-            raise ValueError('Pattern must be within the project root directory.')
+            log.error('Pattern must contain $dataset and $prefix placeholders.')
         self.config[ftype] = pattern
         self.progress[ftype] = False
         self.save()
