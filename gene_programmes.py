@@ -22,9 +22,9 @@ proj = project()
 from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_adata
 from _plots.regplot import temporal_regplot
-from _utils.enrichr import enrichr_continuous
 
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
+    from _utils.enrichr import enrichr_continuous
     out = []
     for col in scores.columns:
         for t in top:
@@ -240,6 +240,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
 
 def check_cnmf_completed(dataset, prefix, n_components = range(10, 71, 10), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
+    proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
     outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix))
     n_spectra_complete = 0
     if not os.path.isdir(f'{outdir}/cnmf_tmp'): os.makedirs(f'{outdir}/cnmf_tmp')
