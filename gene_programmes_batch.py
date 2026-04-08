@@ -43,7 +43,7 @@ def main(args):
         if args.force: cmd += ' --force'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
-            cnmf_complete = check_cnmf_completed(dataset, prefix, cnmf_outdir, 
+            cnmf_complete = check_cnmf_completed(dataset, prefix, 
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]))
             n_jobs = 1 if cnmf_complete else 100
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')

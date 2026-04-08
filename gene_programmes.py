@@ -238,13 +238,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
         loadings.to_csv(f'{savedir}/{prefix}.cnmf_k{k_optim}.txt', sep = '\t', index = True, header = True)
 
-def check_cnmf_completed(dataset, prefix, outdir, n_components = range(10, 71, 10), n_iter = 100):
+def check_cnmf_completed(dataset, prefix, n_components = range(10, 71, 10), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
-    outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
-    outdir = os.path.dirname(outdir)  # remove $prefix to get to the parent directory
+    outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix))
     n_spectra_complete = 0
-    if not os.path.isdir(f'{outdir}/{prefix}/cnmf_tmp'): os.makedirs(f'{outdir}/{prefix}/cnmf_tmp')
-    for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
+    if not os.path.isdir(f'{outdir}/cnmf_tmp'): os.makedirs(f'{outdir}/cnmf_tmp')
+    for f in os.listdir(f'{outdir}/cnmf_tmp'):
         for k in n_components:
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
     if n_spectra_complete < len(n_components)*n_iter:
