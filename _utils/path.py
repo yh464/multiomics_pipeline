@@ -168,6 +168,7 @@ class project():
             else: pattern = pattern.replace(f'{self.project_root}/', '')
         if ftype in self.config and pattern != self.config[ftype] and not force:
             log.error(f'File type {ftype} already exists in path config. Use force = True to overwrite.')
+        elif ftype in self.config.keys() and pattern == self.config[ftype]: return
         if '$dataset' not in pattern or '$prefix' not in pattern:
             log.error('Pattern must contain $dataset and $prefix placeholders.')
         self.config[ftype] = pattern
