@@ -41,7 +41,7 @@ def main(args):
         if not 'X_umap' in adata_norm.obsm and args.umap: sc.tl.umap(adata_norm)
         if not 'X_tsne' in adata_norm.obsm and args.tsne: sc.tl.tsne(adata_norm, n_pcs = 50)
         scdrs.preprocess(adata_norm)
-        sc.write(adata_norm, h5ad_norm)
+        sc.write(h5ad_norm, adata_norm)
 
     if not separate_ensg_only:
         if args.force and os.path.islink(h5ad_scdrs):
@@ -67,7 +67,7 @@ def main(args):
         adata_ensg.obsm['X_tsne'] = adata_norm.obsm['X_tsne']
     
     scdrs.preprocess(adata_ensg)
-    sc.write(adata_ensg, h5ad_scdrs)
+    sc.write(h5ad_scdrs, adata_ensg)
 
 def add_cmd_args(parser):
     parser.add_argument('--scdrs', action = 'store_true', help = 'Preprocess for scDRS (extract only genes in MAGMA gene set)')
