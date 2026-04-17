@@ -455,10 +455,9 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
 
 @log.profile
 def main(args):
-    cnmf_outdir = os.path.dirname(os.path.dirname(proj.config['programmes_cnmf'])).replace(
-        '$dataset', args.dataset).replace('$prefix', args.prefix) # cNMF automatically creates the $prefix subdirectory
-    scired_outdir = os.path.dirname(proj.config['programmes_scired']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
-    spectra_outdir = os.path.dirname(proj.config['programmes_spectra']).replace('$dataset', args.dataset).replace('$prefix', args.prefix)
+    cnmf_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_cnmf', args.dataset, args.prefix))) # cNMF automatically creates the $prefix subdirectory
+    scired_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_scired', args.dataset, args.prefix)))
+    spectra_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_spectra', args.dataset, args.prefix)))
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
             cell_type = args.cell_type, force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None)
