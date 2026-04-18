@@ -45,6 +45,8 @@ class logger():
         self.start_time = time.perf_counter()
         self.cpu_time = time.process_time()
         tracemalloc.start()
+    
+    def __del__(self): tracemalloc.stop()
         
     def log(self, msg, warning = False, error = False, info = False, calling_file = None):
         now = datetime.datetime.now().isoformat(sep = ' ')
