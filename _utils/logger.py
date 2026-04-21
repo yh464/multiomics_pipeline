@@ -80,30 +80,27 @@ class logger():
         print(msg, file = self.file)
         if self.echo and self.file != sys.stdout: print(msg)
 
-    def _cleanup_runtime(self):
-        # Ensure child processes do not keep the Python interpreter alive after main() completes.
-        for child in active_children():
-            if not child.is_alive():
-                continue
-            child.join(timeout = 1)
-            if child.is_alive():
-                self.warn(f'Terminating lingering child process: pid={child.pid}')
-                child.terminate()
-                child.join(timeout = 2)
+    # def _cleanup_runtime(self):
+    #     # Ensure child processes do not keep the Python interpreter alive after main() completes.
+    #     for child in active_children():
+    #         if not child.is_alive():
+    #             continue
+    #         child.join(timeout = 1)
+    #         if child.is_alive():
+    #             self.warn(f'Terminating lingering child process: pid={child.pid}')
+    #             child.terminate()
+    #             child.join(timeout = 2)
 
     def profile(self, func):
         def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except: raise
-            finally:
-                wall_time = time.perf_counter() - self.start_time
-                cpu_time = time.process_time() - self.cpu_time
-                self.log('Analysis finished')
-                self.log(f'    Peak memory usage: {tracemalloc.get_traced_memory()[1] / 1024 ** 2:.2f} MB')
-                self.log(f'    Total time: {wall_time:.2f} seconds')
-                self.log(f'    CPU time: {cpu_time:.2f} seconds')
-                self.log(f'    CPU usage: {(cpu_time / wall_time * 100) if wall_time > 0 else 0:.2f}%')
-                self._cleanup_runtime()
-                tracemalloc.clear_traces()
+            result =  func(*args, **kwargs)
+            wall_time = time.perf_counter() - self.start_time
+            cpu_time = time.process_time() - self.cpu_time
+            self.log('Analysis finished')
+            self.log(f'    Peak memory usage: {tracemalloc.get_traced_memory()[1] / 1024 ** 2:.2f} MB')
+            self.log(f'    Total time: {wall_time:.2f} seconds')
+            self.log(f'    CPU time: {cpu_time:.2f} seconds')
+            self.log(f'    CPU usage: {(cpu_time / wall_time * 100) if wall_time > 0 else 0:.2f}%')
+            tracemalloc.clear_traces()
+            return result
         return wrapper
