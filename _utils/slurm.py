@@ -265,7 +265,6 @@ class array_submitter():
         if self.email: print('#SBATCH --mail-type=ALL', file = wrap)
         if self.account: print(f'#SBATCH -A {self.account}', file = wrap)
         print(f'bash {self.tmpdir}/{self.name}_'+'${SLURM_ARRAY_TASK_ID}.sh', file = wrap)
-        print('scancel ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}', file = wrap) # temporary fix as jobs won't terminate normally
         wrap.close()
 
     # dumps staged commands to a job array
