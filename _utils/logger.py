@@ -95,6 +95,7 @@ class logger():
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
+            except: raise
             finally:
                 wall_time = time.perf_counter() - self.start_time
                 cpu_time = time.process_time() - self.cpu_time

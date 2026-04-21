@@ -98,7 +98,7 @@ def factor_pseudotime_reg(scores, adata, out_fig, cell_type_key, pseudotime_key 
         fig.savefig(out_fig.replace('$factor', col).replace('.png', '_order2.png'), bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_threshold = 0.1, cell_type = [],
+def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, cell_type = [],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
@@ -140,12 +140,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
     
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
-    n_spectra_complete = 0
-    for f in os.listdir(f'{outdir}/{prefix}/cnmf_tmp'):
-        for k in n_components:
-            if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
-    log.log(f'Completed {n_spectra_complete} / {len(n_components)*n_iter} NMF iterations', calling_file = 'run_cnmf')
-    if n_spectra_complete < len(n_components)*n_iter:
+    if not check_cnmf_completed(dataset, prefix, n_components = n_components, n_iter = n_iter):
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
     
@@ -238,7 +233,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(10, 71, 10), density_
         loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
         loadings.to_csv(f'{savedir}/{prefix}.cnmf_k{k_optim}.txt', sep = '\t', index = True, header = True)
 
-def check_cnmf_completed(dataset, prefix, n_components = range(10, 71, 10), n_iter = 100):
+def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100):
     '''check if cNMF has been completed for given dataset / prefix'''
     proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
     outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix))
@@ -472,8 +467,8 @@ def main(args):
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
-    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (10, 70, 10),
-        help = 'Number of components to identify for cNMF (start, stop, step), default: 10 70 10')
+    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (5, 40, 1),
+        help = 'Number of components to identify for cNMF (start, stop, step), default: 5 40 1')
     parser.add_argument('--cnmf_dt', type = float, default = 0.1,
         help = 'Density threshold for cNMF consensus spectra (default: 0.1)')
     parser.add_argument('--scired', action = 'store_true', help = 'Run scIRED to identify gene programmes')
