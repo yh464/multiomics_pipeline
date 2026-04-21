@@ -45,9 +45,6 @@ class logger():
             os.path.basename(inspect.stack()[1].filename).replace('.py','')
         self.start_time = time.perf_counter()
         self.cpu_time = time.process_time()
-        tracemalloc.start()
-    
-    def __del__(self): tracemalloc.stop()
         
     def log(self, msg, warning = False, error = False, info = False, calling_file = None):
         now = datetime.datetime.now().isoformat(sep = ' ')
@@ -93,6 +90,7 @@ class logger():
 
     def profile(self, func):
         def wrapper(*args, **kwargs):
+            tracemalloc.start()
             result =  func(*args, **kwargs)
             wall_time = time.perf_counter() - self.start_time
             cpu_time = time.process_time() - self.cpu_time
@@ -101,6 +99,6 @@ class logger():
             self.log(f'    Total time: {wall_time:.2f} seconds')
             self.log(f'    CPU time: {cpu_time:.2f} seconds')
             self.log(f'    CPU usage: {(cpu_time / wall_time * 100) if wall_time > 0 else 0:.2f}%')
-            tracemalloc.clear_traces()
+            tracemalloc.stop()
             return result
         return wrapper
