@@ -248,7 +248,9 @@ def check_cnmf_completed(dataset, prefix, n_components = range(10, 71, 10), n_it
         for k in n_components:
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
     if n_spectra_complete < len(n_components)*n_iter:
+        log.log(f'{n_spectra_complete} / {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
         return False
+    log.log(f'All {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
     return True
 
 def run_spectra(dataset, prefix, outdir, cell_type):
