@@ -119,7 +119,9 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         projection_dataset = projection[0][0]
         projection_prefix = projection[0][1]
         new_prefix = f'{prefix}_hvg_{projection_dataset}_{projection_prefix}' if projection_dataset not in projection_prefix else f'{prefix}_hvg_{projection_prefix}'
-        projected_h5ad = proj.to_pathname('raw', dataset, new_prefix)
+        tmpdir = os.path.join(proj.project_root, '/temp')
+        os.makedirs(tmpdir, exist_ok = True)
+        projected_h5ad = f'{tmpdir}/{dataset}_{new_prefix}.h5ad'
         projection_genes = os.path.dirname(proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix)) + f'/{projection_prefix}.overdispersed_genes.txt'
         if worker_id == 0: subset_h5ad(h5ad_raw, projected_h5ad, projection_genes)
         elif not os.path.isfile(projected_h5ad) or not os.access(projected_h5ad, os.R_OK):
