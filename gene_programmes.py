@@ -121,7 +121,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         new_prefix = f'{prefix}_hvg_{projection_dataset}_{projection_prefix}' if projection_dataset not in projection_prefix else f'{prefix}_hvg_{projection_prefix}'
         projected_h5ad = proj.to_pathname('raw', dataset, new_prefix)
         projection_genes = os.path.dirname(proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix)) + f'/{projection_prefix}.overdispersed_genes.txt'
-        subset_h5ad(h5ad_raw, projected_h5ad, projection_genes)
+        if worker_id == 0: subset_h5ad(h5ad_raw, projected_h5ad, projection_genes)
+        elif not os.path.isfile(projected_h5ad) or not os.access(projected_h5ad, os.R_OK):
+            log.log(f'Waiting for projected h5ad file to be generated at {projected_h5ad}', calling_file = 'run_cnmf')
+            time.sleep(60)
         log.log(f'Re-fitting cNMF using highly variable genes from {projection_dataset}/{projection_prefix}', calling_file = 'run_cnmf')
         prefix = new_prefix
         h5ad_raw = projected_h5ad
@@ -139,7 +142,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         if worker_id == 0: # prevent other workers from simultaneously writing files
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
         else: 
-            time.sleep(10)
+            time.sleep(1)
             if time.perf_counter() - tic > 600:
                 log.warn('Waiting too long for normalised count file to be generated', calling_file = 'run_cnmf')
                 return
@@ -271,9 +274,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             projected_usages.to_csv(proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k_optim, dt = density_threshold_str), sep = '\t', index = True, header = True)
             cnmf_downstream(projected_usages, projection_loadings, adata, cell_type, outdir, projected_prefix, projection_loadings.shape[0], force, savedir)
         
-        # remove temporary h5ad file with highly variable genes only
-        if os.path.isfile(projected_h5ad): os.remove(projected_h5ad)
-        return # do not register on the progress file
+        return # do not register on the progress file if it is a projection
 
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
