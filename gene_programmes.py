@@ -286,7 +286,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             projected_usages = nmf.transform(adata_normalised.X)
             projected_usages = pd.DataFrame(projected_usages, index = adata_normalised.obs_names, 
                 columns = [i+1 for i in range(projected_usages.shape[1])])
-            projected_prefix = f'{prefix}_proj_{projection_dataset}_{projection_prefix}' if projection_dataset not in projection_prefix else f'{prefix}_proj_{projection_prefix}'
+            projected_prefix = prefix.replace('_hvg_','_proj_')
             projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k_optim, dt = density_threshold_str)
             os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
             projected_usages.to_csv(projected_usages_file, sep = '\t', index = True, header = True)
