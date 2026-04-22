@@ -40,6 +40,7 @@ def main(args):
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} --cnmf_dt {args.cnmf_dt} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} '+ \
             f'--scired_covars {" ".join(args.scired_covars)} --cell_type {" ".join(args.cell_type)}'
+        if len(args.projection) > 0: cmd += ' --project ' + ' '.join(args.projection)
         if args.force: cmd += ' --force'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
