@@ -228,6 +228,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
                 fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
                 plt.close(fig)
             log.log(f'cNMF UMAP plots saved to {plot_dir}', calling_file = 'run_cnmf')
+        elif not 'X_umap' in adata.obsm.keys():
+            log.warn('UMAP coordinates not found in adata.obsm, skipping cNMF UMAP plots.', calling_file = 'run_cnmf')
 
         # pseudotime regression plots
         if len(cell_type) > 0 and 'pseudotime' in adata.obs.columns:
