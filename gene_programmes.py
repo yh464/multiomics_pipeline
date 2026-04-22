@@ -281,6 +281,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = []):
     '''check if cNMF has been completed for given dataset / prefix'''
     proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
+    projection = proj.find_h5ad(projection, long = True)
     if len(projection) > 0:
         projection_dataset = projection[0][0]
         projection_prefix = projection[0][1]
