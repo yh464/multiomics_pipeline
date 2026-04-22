@@ -278,10 +278,11 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         else:
             from sklearn.decomposition import NMF
             log.log(f'Projecting input data onto loadings from {projection_dataset}/{projection_prefix}', calling_file = 'run_cnmf')
+            adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
             projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
+            projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
             nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
             nmf.components_ = projection_loadings.values
-            adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
             projected_usages = nmf.transform(adata_normalised.X)
             projected_usages = pd.DataFrame(projected_usages, index = adata_normalised.obs_names, 
                 columns = [i+1 for i in range(projected_usages.shape[1])])
