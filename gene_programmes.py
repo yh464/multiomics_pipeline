@@ -278,9 +278,13 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
 
-def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100):
+def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = []):
     '''check if cNMF has been completed for given dataset / prefix'''
     proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
+    if len(projection) > 0:
+        projection_dataset = projection[0][0]
+        projection_prefix = projection[0][1]
+        prefix = f'{prefix}_hvg_{projection_dataset}_{projection_prefix}' if projection_dataset not in projection_prefix else f'{prefix}_hvg_{projection_prefix}'
     outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix))
     n_spectra_complete = 0
     if not os.path.isdir(f'{outdir}/cnmf_tmp'): os.makedirs(f'{outdir}/cnmf_tmp')
@@ -497,7 +501,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
 
 @log.profile
 def main(args):
-    projection = proj.find_h5ad(args.project, long = True)
+    projection = proj.find_h5ad(args.projection, long = True)
     if len(projection) > 1: 
         projection = []
         log.warn('Multiple datasets found for projection, ignoring --project argument')
@@ -529,7 +533,7 @@ def add_cmd_args(parser):
         help = 'Covariate columns in adata.obs to adjust for in scIRED (default: sex)')
     parser.add_argument('--spectra', action = 'store_true', help = 'Run Spectra to identify gene programmes')
 
-    parser.add_argument('--project', type = str, nargs = '*', default = [], 
+    parser.add_argument('--project', type = str, nargs = '*', default = [], dest = 'projection',
         help = 'Use pre-computed gene programmes of another dataset and project onto the current dataset. Format <dataset>/<prefix>')
     parser.add_argument('--cell_type', type = str, nargs = '+', default = ['Type_updated'],
         help = '''Categorical factors in adata.obs that denote the cell type. 
