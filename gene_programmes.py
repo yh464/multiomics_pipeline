@@ -28,7 +28,7 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     if type(gene_subset) == str and os.path.isfile(gene_subset): gene_subset = open(gene_subset).read().splitlines()
     adata = sc.read_h5ad(h5ad_in,'r')
     adata = adata[:, [x for x in gene_subset if x in adata.var_names]]
-    adata.write_h5ad(h5ad_out)
+    sc.write(h5ad_out, adata)
 
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
     from _utils.enrichr import enrichr_continuous
@@ -123,7 +123,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         os.makedirs(tmpdir, exist_ok = True)
         projected_h5ad = f'{tmpdir}/{dataset}_{new_prefix}.h5ad'
         projection_genes = os.path.dirname(proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix)) + f'/{projection_prefix}.overdispersed_genes.txt'
-        if worker_id == 0: subset_h5ad(h5ad_raw, projected_h5ad, projection_genes)
+        if worker_id == 0 and not os.path.isfile(projected_h5ad):
+            subset_h5ad(h5ad_raw, projected_h5ad, projection_genes)
         elif not os.path.isfile(projected_h5ad) or not os.access(projected_h5ad, os.R_OK):
             log.log(f'Waiting for projected h5ad file to be generated at {projected_h5ad}', calling_file = 'run_cnmf')
             time.sleep(60)
