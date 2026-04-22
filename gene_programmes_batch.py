@@ -26,8 +26,8 @@ def main(args):
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cnmf_outdir = 'programmes/cnmf/$dataset/$prefix'
-    proj.register('programmes_cnmf',f'{cnmf_outdir}/$prefix.gene_spectra_score.k_*.dt_*.consensus.txt')
-    proj.register('programmes_cnmf_scores',f'{cnmf_outdir}/$prefix.usages.k_*.dt_*.consensus.txt')
+    proj.register('programmes_cnmf',f'{cnmf_outdir}/$prefix.gene_spectra_score.k_$k.dt_$dt.consensus.txt')
+    proj.register('programmes_cnmf_scores',f'{cnmf_outdir}/$prefix.usages.k_$k.dt_$dt.consensus.txt')
     scired_outdir = 'programmes/scired/$dataset/$prefix'
     proj.register('programmes_scired',f'{scired_outdir}/$prefix_scired_loadings.txt')
     proj.register('programmes_scired_scores',f'{scired_outdir}/$prefix_scired_scores.txt')

@@ -80,6 +80,15 @@ class project():
         for dataset, prefix in out_df.index:
             for ftype in other_files:
                 pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+                # replace all placeholders up to the next '.' or '_' character with wildcards '*'
+                while pattern.find('$') >= 0:
+                    start = pattern.find('$')
+                    end_dot = pattern.find('.', start)
+                    end_underscore = pattern.find('_', start)
+                    if end_dot < 0: end_dot = len(pattern)
+                    if end_underscore < 0: end_underscore = len(pattern)
+                    end = min(end_dot, end_underscore)
+                    pattern = pattern[:start] + '*' + pattern[end:]
                 if os.path.exists(pattern):
                     out_df.loc[(dataset, prefix), ftype] = True
                 elif os.path.exists(os.path.dirname(pattern)) and \
@@ -148,16 +157,18 @@ class project():
         self.progress.loc[(dataset, prefix), ftype] = True
         self.progress.to_csv(self.progress_file, sep = '\t', index = True, header = True)
     
-    def to_pathname(self, ftype, dataset, prefix):
+    def to_pathname(self, ftype, dataset, prefix, **kwargs):
         if ftype not in self.config:
             log.error(f'File type {ftype} not found in path config')
         pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
+        for key, value in kwargs.items():
+            pattern = pattern.replace(f'${key}', str(value))
         os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
         return pattern
 
-    def to_pathname_multi(self, ftype, *datasets):
+    def to_pathname_multi(self, ftype, *datasets, **kwargs):
         datasets = self._to_long_format(*datasets)
-        return [self.to_pathname(ftype, dataset, prefix) for dataset, prefix in datasets]
+        return [self.to_pathname(ftype, dataset, prefix, **kwargs) for dataset, prefix in datasets]
 
     def register(self, ftype, pattern, force = False):
         # pattern should be relative to the project root
