@@ -27,7 +27,7 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     import scanpy as sc
     if type(gene_subset) == str and os.path.isfile(gene_subset): gene_subset = open(gene_subset).read().splitlines()
     adata = sc.read_h5ad(h5ad_in,'r')
-    adata = adata[:, gene_subset]
+    adata = adata[:, [x for x in gene_subset if x in adata.var_names]]
     adata.write_h5ad(h5ad_out)
 
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
