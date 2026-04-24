@@ -89,6 +89,7 @@ def scatterplot_adata(adata, v, rep = 'umap', **kwargs):
     rep: representation in adata.obsm to use for coordinates
     all **kwargs are passed to scatterplot_noaxis()
   '''
+  rep = rep[2:] if rep.startswith('X_') else rep
   if rep.lower() == 'umap':
     coord_key = 'X_umap'; rep_axis = 'UMAP'
   elif rep.lower() == 'pca':
@@ -98,7 +99,7 @@ def scatterplot_adata(adata, v, rep = 'umap', **kwargs):
   elif rep.lower() == 'spatial':
     coord_key = 'spatial'; rep_axis = False
   elif rep in adata.obsm.keys():
-    coord_key = rep; rep_axis = rep.upper()
+    coord_key = rep; rep_axis = rep.upper().replace('X_','')
   else:
     raise ValueError(f'Reduced-dimension representation {rep} not in the anndata object')
   x = adata.obsm[coord_key][:,0]
