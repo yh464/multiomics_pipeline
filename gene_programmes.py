@@ -48,6 +48,7 @@ def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
 def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     # FCAT analysis for factor importance
     import sciRED.ensembleFCA
+    if isinstance(scores, pd.DataFrame): scores = scores.values # FCAT function accepts numpy array as input
     fcat_mat = []
     for col in factors_to_explain:
         if col not in adata.obs.columns:
@@ -91,22 +92,49 @@ def factor_correlation(loadings, out_tabular, out_fig):
     plt.close(fig)
     return corr_mat
 
-def factor_pseudotime_reg(scores, adata, out_fig, cell_type_key, pseudotime_key = 'pseudotime'):
+def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force = False):
+    log.log(f'Plotting cell-level scores in embedding space: ' + ', '.join(embedding_key), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
     if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
         out_fig += '.png'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
-    scores = pd.concat([scores, adata.obs[[cell_type_key, pseudotime_key]]], axis = 1).dropna()
-    for col in tqdm(score_cols, desc = 'Plotting factor pseudotime regression'):
-        fig = temporal_regplot(scores, x = pseudotime_key, y = col, hue = cell_type_key)
-        fig.savefig(out_fig.replace('$factor', col), bbox_inches = 'tight', dpi = 400)
-        plt.close(fig)
-        fig = temporal_regplot(scores, x = pseudotime_key, y = col, hue = cell_type_key, order = 2)
-        fig.savefig(out_fig.replace('$factor', col).replace('.png', '_order2.png'), bbox_inches = 'tight', dpi = 400)
-        plt.close(fig)
+    for emb_key in embedding_key:
+        if not emb_key in adata.obsm.keys():
+            log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding', warning = True)
+            continue
+        scores = pd.concat([scores, adata.obs], axis = 1).dropna()
+        for col in tqdm(score_cols, desc = 'Plotting factor embedding regression'):
+            figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
+            if os.path.isfile(figname) and not force: continue
+            fig = scatterplot_adata(adata, v = scores[col], rep = emb_key)
+            fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
+            plt.close(fig)
+    log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, cell_type = [],
+def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
+    log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_keys), calling_file = 'run_cnmf')
+    os.makedirs(os.path.dirname(out_fig), exist_ok = True)
+    if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
+        out_fig += '.png'
+    scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
+    score_cols = scores.columns.tolist()
+    for time_key in time_keys:
+        scores = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
+        for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
+            fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
+            fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
+            if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
+            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key)
+            fig.savefig(out_fig.replace('$factor', col).replace('$timekey', time_key), bbox_inches = 'tight', dpi = 400)
+            plt.close(fig)
+            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key, order = 2)
+            fig.savefig(out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png'), bbox_inches = 'tight', dpi = 400)
+            plt.close(fig)
+    log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
+
+def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, 
+    cell_type = [], embedding = ['X_umap'], time_keys = ['pseudotime'],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None, projection = []):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
@@ -219,27 +247,21 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, force, savedir = None):
         loadings = loadings.T
 
-        # UMAP plot of cell-level scores
         plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
         os.makedirs(plot_dir, exist_ok = True)
-        if (not all([os.path.isfile(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png') for component in range(1, k_optim+1)]) or force) and \
-            'X_umap' in adata.obsm.keys():
-            log.log('Plotting cNMF cell-level scores in UMAP space', calling_file = 'run_cnmf')
-            for component in tqdm(usages.columns.tolist(), desc = 'Plotting cNMF cell-level scores in UMAP space'):
-                fig = scatterplot_adata(adata, v = usages[component], rep = 'umap')
-                fig.savefig(f'{plot_dir}/{prefix}_cnmf_k{k_optim}_f{component}.png', bbox_inches = 'tight', dpi = 400)
-                plt.close(fig)
-            log.log(f'cNMF UMAP plots saved to {plot_dir}', calling_file = 'run_cnmf')
-        elif not 'X_umap' in adata.obsm.keys():
-            log.warn('UMAP coordinates not found in adata.obsm, skipping cNMF UMAP plots.', calling_file = 'run_cnmf')
+
+        # UMAP plot of cell-level scores
+        rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
+        if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.png', 
+            embedding_key = rep_names, force = force)
+        else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf', warning = True)
 
         # pseudotime regression plots
-        if len(cell_type) > 0 and 'pseudotime' in adata.obs.columns:
-            out_fig = f'{plot_dir}/{prefix}_cnmf_k{k_optim}_factor_pseudotime.png'
-            if not os.path.isfile(out_fig) or force:
-                log.log('Plotting cNMF factor pseudotime regression', calling_file = 'run_cnmf')
-                factor_pseudotime_reg(usages, adata, out_fig, cell_type[0])
-            log.log(f'cNMF factor pseudotime regression plots saved to {out_fig}', calling_file = 'run_cnmf')
+        adata.obs.columns = adata.obs.columns.str.lower()
+        time_columns = list(set(['age','time','pseudotime'] + time_keys))
+        if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
+            factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', cell_type[0], force = force)
+        else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
         # factor importance scoring
         out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
@@ -371,7 +393,7 @@ def run_spectra(dataset, prefix, outdir, cell_type):
     proj.complete_step('programmes_spectra_scores', dataset, prefix)
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
-    covar_cols = [], cell_type = [],           
+    covar_cols = [], cell_type = [], embedding = ['X_umap'], time_keys = ['pseudotime'],         
     seed = 19260817, force = False, savedir = None):
     '''
     run consensus NMF on input h5ad file
@@ -456,28 +478,31 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         log.log(f'scIRED cell-level scores saved to {out_scores}', calling_file = 'run_scired')
 
     # plot UMAP scatterplot for all factors
-    os.makedirs(f'{outdir}/plots', exist_ok = True)
-    for factor in tqdm(y_varimax_.columns.tolist(), desc = 'Plotting scIRED cell-level scores in UMAP space'):
-        if 'X_umap' not in adata.obsm.keys(): continue
-        fig = scatterplot_adata(adata, v = y_varimax_[factor], rep = 'umap')
-        fig.savefig(f'{outdir}/plots/{prefix}_scired_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
-        plt.close(fig)
-    log.log(f'scIRED UMAP plots saved to {outdir}/plots', calling_file = 'run_scired')
+    plot_dir = f'{outdir}/plots'; os.makedirs(plot_dir, exist_ok = True)
+    rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
+    if len(rep_names) > 0: factor_embedding(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$embedding.png', 
+        embedding_key = rep_names, force = force)
+    else: log.warn('No embedding found in adata.obsm, skipping scIRED factor embedding plots.', calling_file = 'run_scired', warning = True)
 
     # pseudotime regression plots
-    if len(cell_type) > 0 and 'pseudotime' in adata.obs.columns:
-        factor_pseudotime_reg(y_varimax, adata, f'{outdir}/plots/{prefix}_scired_$factor_pseudotime.png', cell_type[0])
+    adata.obs.columns = adata.obs.columns.str.lower()
+    time_columns = list(set(['age','time','pseudotime'] + time_keys))
+    if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
+        factor_time_reg(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$timekey.png', cell_type[0], force = force)
+    else: log.log('No time-related columns found in adata.obs, skipping scIRED factor pseudotime regression plots.', calling_file = 'run_scired')
 
     # FCAT analysis for factor importance
-    fcat_mat = factor_importance(y_varimax, adata, cell_type, out_fcat, out_fcat_fig)
+    if not os.path.isfile(out_fcat) or not os.path.isfile(out_fcat_fig) or force:
+        fcat_mat = factor_importance(y_varimax_, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
 
     # correlation analysis
     factor_correlation(loading_varimax_, out_corr, out_corr_fig)
 
     # enrichment analysis
-    enrichr_res = factor_enrichr(loading_varimax_, top_negative = True)
-    enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
+    if not os.path.isfile(out_enrichr) or force:
+        enrichr_res = factor_enrichr(loading_varimax_, top_negative = True)
+        enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'scIRED factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_scired')
 
     # correlation with n_umi
@@ -535,13 +560,14 @@ def main(args):
     spectra_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_spectra', args.dataset, args.prefix)))
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
-            cell_type = args.cell_type, force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None, projection = projection)
+            cell_type = args.cell_type, embedding = args.embedding, time_keys = args.time_keys, seed = 19260817,
+            force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None, projection = projection)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
-            n_genes = args.scired_genes, covar_cols = args.scired_covars,
-            cell_type = args.cell_type, force = args.force, savedir = args.magma_out if args.magma else None, projection = projection)
+            n_genes = args.scired_genes, covar_cols = args.scired_covars, cell_type = args.cell_type, embedding = args.embedding, time_keys = args.time_keys, 
+            force = args.force, savedir = args.magma_out if args.magma else None, projection = projection)
     if args.spectra:
-        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0], savedir = args.magma_out if args.magma else None)
+        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0], savedir = args.magma_out if args.magma else None, embedding = args.embedding, time_keys = args.time_keys)
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
@@ -560,11 +586,16 @@ def add_cmd_args(parser):
 
     parser.add_argument('--project', type = str, nargs = '*', default = [], dest = 'projection',
         help = 'Use pre-computed gene programmes of another dataset and project onto the current dataset. Format <dataset>/<prefix>')
+    
     parser.add_argument('--cell_type', type = str, nargs = '+', default = ['Type_updated'],
         help = '''Categorical factors in adata.obs that denote the cell type. 
         Only the first is used for Spectra decomposition and pseudotime regression plots.
         All factors are used for factor importance scoring
         (default: Type_updated)''')
+    parser.add_argument('--embedding', type = str, nargs = '*', default = ['X_umap', 'X_tsne'],
+        help = 'Embedding representations in adata.obsm to use for factor embedding plots (default: X_umap X_tsne)')
+    parser.add_argument('--time_keys', type = str, nargs = '*', default = ['pseudotime', 'age', 'time'],
+        help = 'Column names in adata.obs that denote time-related variables to use for pseudotime regression plots (default: pseudotime age time)')
     parser.add_argument('--magma', action = 'store_true', help = 'Format output for MAGMA GSEA')
     parser.add_argument('--magma_out', default = '../gene_score', help = 'Output directory for MAGMA formatted gene weights (default: ../gene_score)')
     parser.add_argument('-f','--force', action = 'store_true', help = 'Force overwrite')
