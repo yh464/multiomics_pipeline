@@ -260,7 +260,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         adata.obs.columns = adata.obs.columns.str.lower()
         time_columns = list(set(['age','time','pseudotime'] + time_keys))
         if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
-            factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', cell_type[0], force = force)
+            factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', 
+                cell_type[0], time_keys = adata.obs.columns.intersection(time_columns), force = force)
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
         # factor importance scoring
