@@ -67,6 +67,7 @@ def temporal_regplot(
     '''
 
     df = df.dropna()
+    df[x] = df[x].astype(float) # ensure x is numeric
     if xlabel is None: xlabel = x.replace('_',' ')
     if ylabel is None: ylabel = y.replace('_',' ')
     sns.set_style('ticks')
