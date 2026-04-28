@@ -120,7 +120,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_key = ['pseudoti
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     for time_key in time_key:
-        time_xlabel = '' if time_key.contains('pseudo') else time_key.replace('_',' ')
+        time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
         scores = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
         for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
             fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
