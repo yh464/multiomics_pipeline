@@ -112,14 +112,14 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             plt.close(fig)
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
 
-def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
-    log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_keys), calling_file = 'run_cnmf')
+def factor_time_reg(scores, adata, out_fig, cell_type_key, time_key = ['pseudotime'], force = False):
+    log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_key), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
     if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
         out_fig += '.png'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
-    for time_key in time_keys:
+    for time_key in time_key:
         time_xlabel = '' if time_key.contains('pseudo') else time_key.replace('_',' ')
         scores = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
         for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
@@ -135,7 +135,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, 
-    cell_type = [], embedding = ['X_umap'], time_keys = ['pseudotime'],
+    cell_type = [], embedding = ['X_umap'], time_key = ['pseudotime'],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None, projection = []):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
@@ -259,10 +259,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
         # pseudotime regression plots
         adata.obs.columns = adata.obs.columns.str.lower()
-        time_columns = list(set(['age','time','pseudotime'] + time_keys))
+        time_columns = list(set(['age','time','pseudotime'] + time_key))
         if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
             factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', 
-                cell_type[0], time_keys = adata.obs.columns.intersection(time_columns), force = force)
+                cell_type[0], time_key = adata.obs.columns.intersection(time_columns), force = force)
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
         # factor importance scoring
@@ -395,7 +395,7 @@ def run_spectra(dataset, prefix, outdir, cell_type):
     proj.complete_step('programmes_spectra_scores', dataset, prefix)
 
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
-    covar_cols = [], cell_type = [], embedding = ['X_umap'], time_keys = ['pseudotime'],         
+    covar_cols = [], cell_type = [], embedding = ['X_umap'], time_key = ['pseudotime'],         
     seed = 19260817, force = False, savedir = None):
     '''
     run consensus NMF on input h5ad file
@@ -488,7 +488,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
 
     # pseudotime regression plots
     adata.obs.columns = adata.obs.columns.str.lower()
-    time_columns = list(set(['age','time','pseudotime'] + time_keys))
+    time_columns = list(set(['age','time','pseudotime'] + time_key))
     if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
         factor_time_reg(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$timekey.png', cell_type[0], force = force)
     else: log.log('No time-related columns found in adata.obs, skipping scIRED factor pseudotime regression plots.', calling_file = 'run_scired')
@@ -562,14 +562,14 @@ def main(args):
     spectra_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_spectra', args.dataset, args.prefix)))
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
-            cell_type = args.cell_type, embedding = args.embedding, time_keys = args.time_keys, seed = 19260817,
+            cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817,
             force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None, projection = projection)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
-            n_genes = args.scired_genes, covar_cols = args.scired_covars, cell_type = args.cell_type, embedding = args.embedding, time_keys = args.time_keys, 
+            n_genes = args.scired_genes, covar_cols = args.scired_covars, cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, 
             force = args.force, savedir = args.magma_out if args.magma else None, projection = projection)
     if args.spectra:
-        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0], savedir = args.magma_out if args.magma else None, embedding = args.embedding, time_keys = args.time_keys)
+        run_spectra(args.dataset, args.prefix, spectra_outdir, cell_type = args.cell_type[0], savedir = args.magma_out if args.magma else None, embedding = args.embedding, time_key = args.time_key)
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
@@ -596,7 +596,7 @@ def add_cmd_args(parser):
         (default: Type_updated)''')
     parser.add_argument('--embedding', type = str, nargs = '*', default = ['X_umap', 'X_tsne'],
         help = 'Embedding representations in adata.obsm to use for factor embedding plots (default: X_umap X_tsne)')
-    parser.add_argument('--time_keys', type = str, nargs = '*', default = ['pseudotime', 'age', 'time'],
+    parser.add_argument('--time_key', type = str, nargs = '*', default = ['pseudotime', 'age', 'time'],
         help = 'Column names in adata.obs that denote time-related variables to use for pseudotime regression plots (default: pseudotime age time)')
     parser.add_argument('--magma', action = 'store_true', help = 'Format output for MAGMA GSEA')
     parser.add_argument('--magma_out', default = '../gene_score', help = 'Output directory for MAGMA formatted gene weights (default: ../gene_score)')
