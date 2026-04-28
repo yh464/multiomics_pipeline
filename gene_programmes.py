@@ -112,26 +112,28 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             plt.close(fig)
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
 
-def factor_time_reg(scores, adata, out_fig, cell_type_key, time_key = ['pseudotime'], force = False):
-    log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_key), calling_file = 'run_cnmf')
+def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
+    log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_keys), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
     if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
         out_fig += '.png'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
-    for time_key in time_key:
+    for time_key in time_keys:
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
-        scores = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
+        scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
         for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
             fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
             fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
             if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
-            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key, xlabel = time_xlabel)
-            fig.savefig(out_fig.replace('$factor', col).replace('$timekey', time_key), bbox_inches = 'tight', dpi = 400)
-            plt.close(fig)
-            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
-            fig.savefig(out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png'), bbox_inches = 'tight', dpi = 400)
-            plt.close(fig)
+            if not os.path.isfile(fig_1order) or force:
+                fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, xlabel = time_xlabel)
+                fig.savefig(fig_1order, bbox_inches = 'tight', dpi = 400)
+                plt.close(fig)
+            if not os.path.isfile(fig_2order) or force:
+                fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
+                fig.savefig(fig_2order, bbox_inches = 'tight', dpi = 400)
+                plt.close(fig)
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, 
@@ -262,7 +264,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         time_columns = list(set(['age','time','pseudotime'] + time_key))
         if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
             factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', 
-                cell_type[0], time_key = adata.obs.columns.intersection(time_columns), force = force)
+                cell_type[0].lower(), time_keys = adata.obs.columns.intersection(time_columns), force = force)
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
         # factor importance scoring

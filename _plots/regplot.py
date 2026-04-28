@@ -151,9 +151,6 @@ def temporal_regplot(
         ax.spines['bottom'].set_visible(False)
         ax.tick_params(axis = 'x', which = 'both', bottom = False, top = True, labelbottom = False, labeltop = True)
     else: ax.spines['top'].set_visible(False)
-    
-    ax.set_xlabel(xlabel, fontsize = 12)
-    ax.set_ylabel(ylabel, fontsize = 12)
 
     ax.set_ylim(df[y].min(), df[y].max())
 
@@ -189,5 +186,8 @@ def temporal_regplot(
                 else: annot_axis.text((cat_clipped[x].min() + cat_clipped[x].max()) / 2, current_height - 0.05,
                     cat, fontsize = 12, ha = 'center', va = 'top', color = palette[cat])
             current_height -= 1/4
+    
+    ax.set_xlabel(xlabel, fontsize = 12)
+    ax.set_ylabel(ylabel, fontsize = 12)
     return fig
     
