@@ -150,6 +150,7 @@ def temporal_regplot(
     elif xlabel_groups: # move x axis and labels to the top to make room for group labels
         ax.spines['bottom'].set_visible(False)
         ax.tick_params(axis = 'x', which = 'both', bottom = False, top = True, labelbottom = False, labeltop = True)
+        ax.xaxis.set_label_position('top')
     else: ax.spines['top'].set_visible(False)
 
     ax.set_ylim(df[y].min(), df[y].max())
