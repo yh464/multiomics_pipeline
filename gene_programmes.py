@@ -103,7 +103,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
         if not emb_key in adata.obsm.keys():
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding', warning = True)
             continue
-        scores = pd.concat([scores, adata.obs], axis = 1).dropna()
+        scores = pd.concat([scores, adata.obs], axis = 1)
         for col in tqdm(score_cols, desc = 'Plotting factor embedding regression'):
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
