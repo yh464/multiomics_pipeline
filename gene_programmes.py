@@ -120,15 +120,16 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     for time_key in time_keys:
+        time_xlabel = '' if time_key.contains('pseudo') else time_key.replace('_',' ')
         scores = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
         for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
             fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
             fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
             if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
-            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key)
+            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key, xlabel = time_xlabel)
             fig.savefig(out_fig.replace('$factor', col).replace('$timekey', time_key), bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
-            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key, order = 2)
+            fig = temporal_regplot(scores, x = time_key, y = col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
             fig.savefig(out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png'), bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')

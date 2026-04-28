@@ -49,7 +49,7 @@ def _generate_colour_palette(groups):
 def temporal_regplot(
     df,
     x, y, hue = None, clip_tail = 0.025,
-    xlabel = None, ylabel = None, xlabel_groups = True,
+    xlabel = False, ylabel = None, xlabel_groups = True,
     s = 0.5, alpha = 0.2, 
     order = 1, annotate_corr = True
 ):
@@ -60,8 +60,9 @@ def temporal_regplot(
     hue: categorical variable, different categories will be regressed separately
     clip_tail: for each category in hue, clip the top and bottom tail of x axis values by this proportion to avoid outlier effects
         values > 1 are considered MADs and values < 1 are considered quantiles
-    xlabel, ylabel: axis labels
-    xlabel_groups: whether to show x axis labels for each group separately
+    xlabel, ylabel: axis labels, specify False to hide, None to use the column name
+    if xlabel is False, the horizontal spine will be hidden
+    xlabel_groups: whether to show x axis labels for each group separately, only applicable when hue is not None
     s: point size
     alpha: point transparency
     '''
@@ -70,15 +71,23 @@ def temporal_regplot(
     df[x] = df[x].astype(float) # ensure x is numeric
     if xlabel is None: xlabel = x.replace('_',' ')
     if ylabel is None: ylabel = y.replace('_',' ')
+    if xlabel is False: xlabel = ''
+    if ylabel is False: ylabel = ''
+    if not isinstance(xlabel, str): raise ValueError('xlabel should be a string, None, or False')
+    if not isinstance(ylabel, str): raise ValueError('ylabel should be a string, None, or False')
     sns.set_style('ticks')
     if order == 2: annotate_corr = False # disable correlation annotation for quadratic regression
+    if hue is None: xlabel_groups = False # no groups if hue is None
 
     # simple regression plots
     if hue is None:
         fig, ax = plt.subplots(figsize = (7, 4))
         ax_position = ax.get_position()
-        ax.spines[['top','right','bottom']].set_visible(False)
-        ax.set_xticks([])
+        ax.spines[['top','right']].set_visible(False)
+        if xlabel == '':
+            ax.spines['bottom'].set_visible(False)
+            ax.set_xticks([])
+
         ax.set_ylim(df[y].min(), df[y].max())
         sns.regplot(
             data = df,
@@ -123,8 +132,8 @@ def temporal_regplot(
 
     # if xlabels are needed for each group, then we need another axis for annotations
     if xlabel_groups:
-        annot_height = len(groups)/4 # 0.33 inches per group
-        fig = plt.Figure(figsize = (7, 4 + annot_height)) # 0.33 inches per group
+        annot_height = len(groups)/4 # 0.25 inches per group
+        fig = plt.Figure(figsize = (7, 4 + annot_height)) # 0.25 inches per group
         ax = fig.add_axes((0.3/7, annot_height/ (4 + annot_height), 6.4/7, 3.7/(4 + annot_height)))
         annot_axis = fig.add_axes((0.3/7, 0.05/ (4 + annot_height), 6.4/7, (annot_height-0.05)/(4 + annot_height)))
         annot_axis.spines[['top','right','bottom','left']].set_visible(False)
@@ -134,8 +143,18 @@ def temporal_regplot(
         ax = fig.add_axes((0.3/7, 0.3/4, 6.4/7, 3.4/4))
     ax_position = ax.get_position()
     figsize = fig.get_size_inches()
-    ax.spines[['top','right','bottom']].set_visible(False)
-    ax.set_xticks([])
+    ax.spines['right'].set_visible(False)
+    if xlabel == '':
+        ax.spines[['top','bottom']].set_visible(False)
+        ax.set_xticks([])
+    elif xlabel_groups: # move x axis and labels to the top to make room for group labels
+        ax.spines['bottom'].set_visible(False)
+        ax.tick_params(axis = 'x', which = 'both', bottom = False, top = True, labelbottom = False, labeltop = True)
+    else: ax.spines['top'].set_visible(False)
+    
+    ax.set_xlabel(xlabel, fontsize = 12)
+    ax.set_ylabel(ylabel, fontsize = 12)
+
     ax.set_ylim(df[y].min(), df[y].max())
 
     # plot regression lines for each category with tails clipped
@@ -170,8 +189,5 @@ def temporal_regplot(
                 else: annot_axis.text((cat_clipped[x].min() + cat_clipped[x].max()) / 2, current_height - 0.05,
                     cat, fontsize = 12, ha = 'center', va = 'top', color = palette[cat])
             current_height -= 1/4
-        ax.set_xlabel('')
-    else: ax.set_xlabel(xlabel, fontsize = 12)
-    ax.set_ylabel(ylabel, fontsize = 12)
     return fig
     
