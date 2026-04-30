@@ -17,8 +17,10 @@ from _utils.slurm import array_submitter, add_slurm_args_dec
 from gene_programmes import check_cnmf_completed, add_cmd_args
 
 def main(args):
+    cnmf_prep_submitter = array_submitter(name = 'cnmf_prep_' + '_'.join(args.datasets),
+        partition = 'icelake-himem', n_cpu = 32, timeout = 120)
     cnmf_submitter = array_submitter(name = 'cnmf_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cnmf_components)),
-        partition = 'icelake-himem', n_cpu = 4, timeout = 120)
+        partition = 'icelake-himem', n_cpu = 4, timeout = 720, dependency = cnmf_prep_submitter)
     scired_submitter = array_submitter(name = 'scired_batch_' + '_'.join(args.datasets),
         partition = 'sapphire', n_cpu = 32, timeout = 720)
     spectra_submitter = array_submitter(name = 'spectra_batch_' + '_'.join(args.datasets),
@@ -48,6 +50,9 @@ def main(args):
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]),
                 projection = args.projection)
             n_jobs = 1 if cnmf_complete else 100
+            # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
+            if not os.path.isfile(f'{cnmf_outdir}/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)):
+                cnmf_prep_submitter.append(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
         if args.scired: scired_submitter.add(cmd + ' --scired')
         if args.spectra: spectra_submitter.add(cmd + ' --spectra')

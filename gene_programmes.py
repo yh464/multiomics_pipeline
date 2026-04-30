@@ -171,16 +171,16 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
 
     # check progress and preprocess data
-    tic = time.perf_counter()
-    while not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']) or \
+    # preprocessing takes much more memory than subsequent computation
+    if not os.path.isfile(cnmf_obj.paths['normalized_counts']) or not os.path.isfile(cnmf_obj.paths['tpm']) or \
         not os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) or not os.access(cnmf_obj.paths['tpm'], os.R_OK):
-        if worker_id == 0: # prevent other workers from simultaneously writing files
+        if worker_id == -1: # prevent other workers from simultaneously writing files
+            log.log('Worker id is set to -1, this programme will only pre-process the h5ad file and exit')
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
         else: 
-            time.sleep(1)
-            if time.perf_counter() - tic > 600:
-                log.warn('Waiting too long for normalised count file to be generated', calling_file = 'run_cnmf')
-                return
+            log.log('Pre-processing step is not complete, please re-run the programme setting worker_id to -1')
+            return
+    
     if worker_id == 0: 
         log.log('Setting cNMF runtime parameters', calling_file = 'run_cnmf')
         replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
