@@ -177,6 +177,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         if worker_id == -1: # prevent other workers from simultaneously writing files
             log.log('Worker id is set to -1, this programme will only pre-process the h5ad file and exit')
             cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
+            return
         else: 
             log.log('Pre-processing step is not complete, please re-run the programme setting worker_id to -1')
             return
