@@ -591,7 +591,7 @@ def add_cmd_args(parser):
     parser.add_argument('--project', type = str, nargs = '*', default = [], dest = 'projection',
         help = 'Use pre-computed gene programmes of another dataset and project onto the current dataset. Format <dataset>/<prefix>')
     
-    parser.add_argument('--cell_type', type = str, nargs = '+', default = ['Type_updated'],
+    parser.add_argument('--cell_type', type = str, nargs = '+', default = ['cell_type'],
         help = '''Categorical factors in adata.obs that denote the cell type. 
         Only the first is used for Spectra decomposition and pseudotime regression plots.
         All factors are used for factor importance scoring

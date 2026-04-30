@@ -52,7 +52,7 @@ def main(args):
             n_jobs = 1 if cnmf_complete else 100
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
             if not os.path.isfile(f'{cnmf_outdir}/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)):
-                cnmf_prep_submitter.append(cmd + ' --cnmf --worker -1')
+                cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
         if args.scired: scired_submitter.add(cmd + ' --scired')
         if args.spectra: spectra_submitter.add(cmd + ' --spectra')
