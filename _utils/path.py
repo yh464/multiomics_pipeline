@@ -163,7 +163,10 @@ class project():
         pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
         for key, value in kwargs.items():
             pattern = pattern.replace(f'${key}', str(value))
-        if pattern.find('$') >= 0: log.warn(f'Not all placeholders have been supplied, replacing following placeholders with wildcards *:')
+        os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
+        
+        # if there are still placeholders, give a warning if file is not uniquely defined after replacing placeholders with wildcards
+        missing_placeholders = []
         while pattern.find('$') >= 0:
             start = pattern.find('$')
             end_dot = pattern.find('.', start)
@@ -171,9 +174,17 @@ class project():
             if end_dot < 0: end_dot = len(pattern)
             if end_underscore < 0: end_underscore = len(pattern)
             end = min(end_dot, end_underscore)
-            log.warn(f'    {pattern[start:end]}', calling_file = 'path/to_pathname')
+            missing_placeholders.append(pattern[start:end])
             pattern = pattern[:start] + '*' + pattern[end:]
-        os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
+        if missing_placeholders:
+            # search for files matching the pattern
+            dir_pattern = os.path.dirname(pattern)
+            files = [f for f in os.listdir(dir_pattern) if fnmatch(f, os.path.basename(pattern))]
+            if len(files) != 1:
+                log.warn(f'Variables are not fully defined for {pattern}: '+ ', '.join(missing_placeholders))
+                log.warn(f'Found {len(files)} files matching the pattern: ')
+                for f in files: log.warn(f'    {f}')
+            else: pattern = os.path.join(dir_pattern, files[0])
         return pattern
 
     def to_pathname_multi(self, ftype, *datasets, **kwargs):

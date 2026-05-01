@@ -71,7 +71,8 @@ def main(args):
                 projection = args.projection)
             n_jobs = 1 if cnmf_complete else 100
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
-            norm_counts = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix)) + f'/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)
+            norm_counts = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix), k = 10, dt = '0_1') + \
+                f'/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)
             log.log(f'Looking for {norm_counts} to determine if cNMF preprocessing is complete')
             if not os.path.isfile(norm_counts):
                 cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')

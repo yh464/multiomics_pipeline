@@ -75,6 +75,18 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     plt.close(fig)
     return fcat_mat
 
+def factor_celltype_stats(scores, adata, cell_type_key, out_tabular):
+    cell_type_mean = []; cell_type_sd = []
+    for ct in cell_type_key:
+        cell_type_mean.append(scores.groupby(adata.obs[ct]).mean().assign(annot = ct).reset_index(names = 'cell_type'))
+        cell_type_sd.append(scores.groupby(adata.obs[ct]).std().assign(annot = ct).reset_index(names = 'cell_type'))
+    cell_type_mean = pd.concat(cell_type_mean, axis = 0).set_index(['annot','cell_type'])
+    cell_type_mean.columns = [f'F{i}_mean' for i, _ in enumerate(cell_type_mean.columns)]
+    cell_type_sd = pd.concat(cell_type_sd, axis = 0).set_index(['annot','cell_type'])
+    cell_type_sd.columns = [f'F{i}_sd' for i, _ in enumerate(cell_type_sd.columns)]
+    cell_type_stats = pd.concat([cell_type_mean, cell_type_sd], axis = 1).sort_index(axis = 1, key = lambda x: x.str.extract(r'F(\d+)_')[0].astype(int))
+    cell_type_stats.to_csv(out_tabular, sep = '\t', index = True, header = True)
+
 def factor_correlation(loadings, out_tabular, out_fig):
     from scipy.cluster.hierarchy import linkage, dendrogram
     loadings.columns = [f'F{i+1}' for i in range(loadings.shape[1])]
@@ -254,6 +266,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
         plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
         os.makedirs(plot_dir, exist_ok = True)
+        out_celltype = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_celltype_stats.txt'
+        out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
+        out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
+        out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
+        out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
+        out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
 
         # UMAP plot of cell-level scores
         rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
@@ -270,32 +288,17 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
         # cell type descriptive stats
-        if len(cell_type) > 0:
-            out_celltype = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_celltype_stats.txt'
-            cell_type_mean = []; cell_type_sd = []
-            for ct in cell_type:
-                cell_type_mean.append(usages.groupby(adata.obs[ct]).mean().assign(annot = ct).reset_index(names = 'cell_type'))
-                cell_type_sd.append(usages.groupby(adata.obs[ct]).std().assign(annot = ct).reset_index(names = 'cell_type'))
-            cell_type_mean = pd.concat(cell_type_mean, axis = 0).set_index(['annot','cell_type'])
-            cell_type_mean.columns = [f'F{col}_mean' for col in cell_type_mean.columns]
-            cell_type_sd = pd.concat(cell_type_sd, axis = 0).set_index(['annot','cell_type'])
-            cell_type_sd.columns = [f'F{col}_sd' for col in cell_type_sd.columns]
-            cell_type_stats = pd.concat([cell_type_mean, cell_type_sd], axis = 1).sort_index(axis = 1, key = lambda x: x.str.extract(r'F(\d+)_')[0].astype(int))
-            cell_type_stats.to_csv(out_celltype, sep = '\t', index = True, header = True)
-            log.log(f'cNMF cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_cnmf')
-            
+        if len(cell_type) > 0 and (not os.path.isfile(out_celltype) or force):
+            factor_celltype_stats(usages, adata, cell_type, out_celltype)
+        log.log(f'cNMF cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_cnmf')
+
         # factor importance scoring
-        out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
-        out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
         if (not os.path.isfile(out_fcat) or force) and len(cell_type) > 0 and cell_type[0] in adata.obs.columns:
             log.log('Conducting cNMF factor importance analysis', calling_file = 'run_cnmf')
             factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
         log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
 
         # correlation and enrichment analysis
-        out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
-        out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
-        out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
         if not os.path.isfile(out_corr) or force: factor_correlation(loadings, out_corr, out_corr_fig)
         log.log(f'cNMF factor correlation plot saved to {out_corr_fig}', calling_file = 'run_cnmf')
         if not os.path.isfile(out_enrichr) or force:
@@ -353,7 +356,7 @@ def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter
         projection_dataset = projection[0][0]
         projection_prefix = projection[0][1]
         prefix = f'{prefix}_hvg_{projection_dataset}_{projection_prefix}' if projection_dataset not in projection_prefix else f'{prefix}_hvg_{projection_prefix}'
-    outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix))
+    outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix), k = 10, dt = '0_1')
     n_spectra_complete = 0
     if not os.path.isdir(f'{outdir}/cnmf_tmp'): os.makedirs(f'{outdir}/cnmf_tmp')
     for f in os.listdir(f'{outdir}/cnmf_tmp'):
@@ -432,6 +435,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     os.makedirs(outdir, exist_ok = True)
     out_loading = f'{outdir}/{prefix}_scired_loadings.txt'
     out_scores = f'{outdir}/{prefix}_scired_scores.txt'
+    out_celltype = f'{outdir}/{prefix}_scired_celltype_stats.txt'
     out_fcat = f'{outdir}/{prefix}_scired_fcat.txt'
     out_fcat_fig = f'{outdir}/{prefix}_scired_fcat.pdf'
     out_corr = f'{outdir}/{prefix}_scired_correlation.txt'
@@ -516,6 +520,11 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     if not os.path.isfile(out_fcat) or not os.path.isfile(out_fcat_fig) or force:
         fcat_mat = factor_importance(y_varimax_, adata, cell_type, out_fcat, out_fcat_fig)
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
+
+    # cell type descriptive stats
+    if len(cell_type) > 0 and (not os.path.isfile(out_celltype) or force):
+        factor_celltype_stats(y_varimax_, adata, cell_type, out_celltype)
+    log.log(f'scIRED cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_scired')
 
     # correlation analysis
     factor_correlation(loading_varimax_, out_corr, out_corr_fig)
