@@ -292,8 +292,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
         # cell type descriptive stats
-        if len(cell_type) > 0 and (not os.path.isfile(out_celltype) or force):
-            factor_celltype_stats(usages, adata, cell_type, out_celltype)
+        if len(cell_type) > 0: factor_celltype_stats(usages, adata, cell_type, out_celltype)
         log.log(f'cNMF cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_cnmf')
 
         # factor importance scoring
@@ -303,7 +302,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
 
         # correlation and enrichment analysis
-        if not os.path.isfile(out_corr) or force: factor_correlation(loadings, out_corr, out_corr_fig)
+        factor_correlation(loadings, out_corr, out_corr_fig)
         log.log(f'cNMF factor correlation plot saved to {out_corr_fig}', calling_file = 'run_cnmf')
         if not os.path.isfile(out_enrichr) or force:
             enrichr_res = factor_enrichr(loadings, top_negative = False)
@@ -526,8 +525,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     log.log(f'scIRED factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_scired')
 
     # cell type descriptive stats
-    if len(cell_type) > 0 and (not os.path.isfile(out_celltype) or force):
-        factor_celltype_stats(y_varimax_, adata, cell_type, out_celltype)
+    if len(cell_type) > 0: factor_celltype_stats(y_varimax_, adata, cell_type, out_celltype)
     log.log(f'scIRED cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_scired')
 
     # correlation analysis
