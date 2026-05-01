@@ -23,7 +23,7 @@ def get_cell_types(dataset, prefix, default):
     log.log(f'Following columns are found in {dataset}/{prefix} metadata:')
     for i, col in enumerate(adata.obs.columns):
         log.log(f'    {i}: {col}')
-    selected_cols = input('Enter the column numbers for cell types, separated by space: ' + str(default)).strip()
+    selected_cols = input('Enter the column numbers for cell types, separated by space: \n' + str(default)).strip() + ' '
     selected_cols = [adata.obs.columns[int(x)] for x in set(selected_cols.split())]
     if len(selected_cols) == 0: selected_cols = [x for x in default if x in adata.obs.columns]
     if len(selected_cols) == 0: log.error('No valid cell type column selected/found, please check your input and dataset metadata')
