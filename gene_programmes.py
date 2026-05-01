@@ -54,7 +54,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
         if col not in adata.obs.columns:
             log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'factor_importance', warning = True)
             continue
-        elif isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object:
+        elif (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object) and adata.obs[col].nunique() > 1:
             fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
                 scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
             fcat_col['explained_factor'] = fcat_col.index
