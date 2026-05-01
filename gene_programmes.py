@@ -81,9 +81,9 @@ def factor_celltype_stats(scores, adata, cell_type_key, out_tabular):
         cell_type_mean.append(scores.groupby(adata.obs[ct], observed=True).mean().assign(annot = ct).reset_index(names = 'cell_type'))
         cell_type_sd.append(scores.groupby(adata.obs[ct], observed=True).std().assign(annot = ct).reset_index(names = 'cell_type'))
     cell_type_mean = pd.concat(cell_type_mean, axis = 0).set_index(['annot','cell_type'])
-    cell_type_mean.columns = [f'F{i}_mean' for i, _ in enumerate(cell_type_mean.columns)]
+    cell_type_mean.columns = [f'F{i+1}_mean' for i, _ in enumerate(cell_type_mean.columns)]
     cell_type_sd = pd.concat(cell_type_sd, axis = 0).set_index(['annot','cell_type'])
-    cell_type_sd.columns = [f'F{i}_sd' for i, _ in enumerate(cell_type_sd.columns)]
+    cell_type_sd.columns = [f'F{i+1}_sd' for i, _ in enumerate(cell_type_sd.columns)]
     cell_type_stats = pd.concat([cell_type_mean, cell_type_sd], axis = 1).sort_index(axis = 1, key = lambda x: x.str.extract(r'F(\d+)_')[0].astype(int))
     cell_type_stats.to_csv(out_tabular, sep = '\t', index = True, header = True)
 
