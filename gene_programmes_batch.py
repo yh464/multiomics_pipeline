@@ -58,6 +58,7 @@ def main(args):
         # if cell type is set as default
         if args.cell_type == ['cell_type']:
             selected_cell_types = get_cell_types(dataset, prefix, args.cell_type)
+        else: selected_cell_types = args.cell_type
 
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} --cnmf_dt {args.cnmf_dt} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} --scired_covars {" ".join(args.scired_covars)} '+ \

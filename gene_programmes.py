@@ -601,7 +601,7 @@ def main(args):
         
 def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
-    parser.add_argument('--cnmf_components', type = int, nargs = 3, default = (5, 40, 1),
+    parser.add_argument('--cnmf_components', type = int, nargs = '+', default = (5, 40, 1),
         help = 'Number of components to identify for cNMF (start, stop, step), default: 5 40 1')
     parser.add_argument('--cnmf_dt', type = float, default = 0.1,
         help = 'Density threshold for cNMF consensus spectra (default: 0.1)')
@@ -639,6 +639,9 @@ if __name__ == '__main__':
     parser.add_argument('--worker', type = int, default = 0, help = 'Worker ID for parallel processing (default: 0)')
     parser = add_cmd_args(parser)
     args = parser.parse_args()
-    args.cnmf_components = range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2])
+    if len(args.cnmf_components) == 3: 
+        args.cnmf_components = range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2])
+    elif len(args.cnmf_components) == 1: args.cnmf_components = [args.cnmf_components[0]]
+    else: log.error('Invalid format for --cnmf_components, please provide either a single integer or three integers for start, stop, step')
     log.splash(args)
     main(args)
