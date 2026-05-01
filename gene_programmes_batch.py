@@ -16,19 +16,20 @@ proj = project()
 from _utils.slurm import array_submitter, add_slurm_args_dec
 from gene_programmes import check_cnmf_completed, add_cmd_args
 
-def get_cell_types(dataset, prefix, default):
+def get_obs_cols(dataset, prefix, default, input_string = 'cell type'):
     import scanpy as sc
     adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+    default = [x for x in default if x in adata.obs.columns]
     # take keyboard input to select cell type columns
     log.log(f'Following columns are found in {dataset}/{prefix} metadata:')
     for i, col in enumerate(adata.obs.columns):
         log.log(f'    {i}: {col}')
-    selected_cols = input('Enter the column numbers for cell types, separated by space: \n' + str(default) + ' ').strip()
+    selected_cols = input(f'Enter the column numbers for {input_string}, separated by space: \n' + str(default) + ' ').strip()
     selected_cols = [adata.obs.columns[int(x)] for x in selected_cols.split()]
-    if len(selected_cols) == 0: selected_cols = [x for x in default if x in adata.obs.columns]
-    if len(selected_cols) == 0: log.error('No valid cell type column selected/found, please check your input and dataset metadata')
+    if len(selected_cols) == 0: selected_cols = default
+    if len(selected_cols) == 0: log.warn('No valid cell type column selected/found, please check your input and dataset metadata')
     print()
-    log.log('Selected cell type columns: ')
+    log.log('Selected ' + input_string + ' columns: ')
     for col in selected_cols: log.log(f'    {col}')
     return selected_cols
 
@@ -56,13 +57,14 @@ def main(args):
 
     for dataset, prefix in h5ad:
         # if cell type is set as default
-        if args.cell_type == ['cell_type']:
-            selected_cell_types = get_cell_types(dataset, prefix, args.cell_type)
+        if args.cell_type == ['cell_type']: selected_cell_types = get_obs_cols(dataset, prefix, args.cell_type)
         else: selected_cell_types = args.cell_type
+        if args.time_key == ['pseudotime', 'age', 'time']: selected_time_keys = get_obs_cols(dataset, prefix, args.time_key, input_string = 'time-related variable')
+        else: selected_time_keys = args.time_key
 
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} --cnmf_dt {args.cnmf_dt} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} --scired_covars {" ".join(args.scired_covars)} '+ \
-            f'--cell_type {" ".join(selected_cell_types)} --time_key {" ".join(args.time_key)} --embedding {" ".join(args.embedding)}'
+            f'--cell_type {" ".join(selected_cell_types)} --time_key {" ".join(selected_time_keys)} --embedding {" ".join(args.embedding)}'
         if len(args.projection) > 0: cmd += ' --project ' + ' '.join(args.projection)
         if args.force: cmd += ' --force'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
