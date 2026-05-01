@@ -18,7 +18,7 @@ from gene_programmes import check_cnmf_completed, add_cmd_args
 
 def get_cell_types(dataset, prefix, default):
     import scanpy as sc
-    adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix))
+    adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
     # take keyboard input to select cell type columns
     log.log(f'Following columns are found in {dataset}/{prefix} metadata:')
     for i, col in enumerate(adata.obs.columns):
