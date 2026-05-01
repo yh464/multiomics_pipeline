@@ -78,8 +78,8 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
 def factor_celltype_stats(scores, adata, cell_type_key, out_tabular):
     cell_type_mean = []; cell_type_sd = []
     for ct in cell_type_key:
-        cell_type_mean.append(scores.groupby(adata.obs[ct]).mean().assign(annot = ct).reset_index(names = 'cell_type'))
-        cell_type_sd.append(scores.groupby(adata.obs[ct]).std().assign(annot = ct).reset_index(names = 'cell_type'))
+        cell_type_mean.append(scores.groupby(adata.obs[ct], observed=True).mean().assign(annot = ct).reset_index(names = 'cell_type'))
+        cell_type_sd.append(scores.groupby(adata.obs[ct], observed=True).std().assign(annot = ct).reset_index(names = 'cell_type'))
     cell_type_mean = pd.concat(cell_type_mean, axis = 0).set_index(['annot','cell_type'])
     cell_type_mean.columns = [f'F{i}_mean' for i, _ in enumerate(cell_type_mean.columns)]
     cell_type_sd = pd.concat(cell_type_sd, axis = 0).set_index(['annot','cell_type'])
