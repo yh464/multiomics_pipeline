@@ -163,6 +163,16 @@ class project():
         pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
         for key, value in kwargs.items():
             pattern = pattern.replace(f'${key}', str(value))
+        if pattern.find('$') >= 0: log.warning(f'Not all placeholders have been supplied, replacing following placeholders with wildcards *:')
+        while pattern.find('$') >= 0:
+            start = pattern.find('$')
+            end_dot = pattern.find('.', start)
+            end_underscore = pattern.find('_', start)
+            if end_dot < 0: end_dot = len(pattern)
+            if end_underscore < 0: end_underscore = len(pattern)
+            end = min(end_dot, end_underscore)
+            log.warning(f'    {pattern[start:end]}', calling_file = 'path/to_pathname')
+            pattern = pattern[:start] + '*' + pattern[end:]
         os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
         return pattern
 

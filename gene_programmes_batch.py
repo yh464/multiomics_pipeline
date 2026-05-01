@@ -16,6 +16,22 @@ proj = project()
 from _utils.slurm import array_submitter, add_slurm_args_dec
 from gene_programmes import check_cnmf_completed, add_cmd_args
 
+def get_cell_types(dataset, prefix, default):
+    import scanpy as sc
+    adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix))
+    # take keyboard input to select cell type columns
+    log.log(f'Following columns are found in {dataset}/{prefix} metadata:')
+    for i, col in enumerate(adata.obs.columns):
+        log.log(f'    {i}: {col}')
+    selected_cols = input('Enter the column numbers for cell types, separated by space: ' + str(default)).strip()
+    selected_cols = [adata.obs.columns[int(x)] for x in set(selected_cols.split())]
+    if len(selected_cols) == 0: selected_cols = [x for x in default if x in adata.obs.columns]
+    if len(selected_cols) == 0: log.error('No valid cell type column selected/found, please check your input and dataset metadata')
+    print()
+    log.log('Selected cell type columns: ')
+    for col in selected_cols: log.log(f'    {col}')
+    return selected_cols
+
 def main(args):
     cnmf_prep_submitter = array_submitter(name = 'cnmf_prep_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 32, timeout = 120)
@@ -39,9 +55,13 @@ def main(args):
     cnmf_components_str = ' '.join([str(x) for x in args.cnmf_components])
 
     for dataset, prefix in h5ad:
+        # if cell type is set as default
+        if args.cell_type == ['cell_type']:
+            selected_cell_types = get_cell_types(dataset, prefix, args.cell_type)
+
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} --cnmf_dt {args.cnmf_dt} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} --scired_covars {" ".join(args.scired_covars)} '+ \
-            f'--cell_type {" ".join(args.cell_type)} --time_key {" ".join(args.time_key)} --embedding {" ".join(args.embedding)}'
+            f'--cell_type {" ".join(selected_cell_types)} --time_key {" ".join(args.time_key)} --embedding {" ".join(args.embedding)}'
         if len(args.projection) > 0: cmd += ' --project ' + ' '.join(args.projection)
         if args.force: cmd += ' --force'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
@@ -51,7 +71,9 @@ def main(args):
                 projection = args.projection)
             n_jobs = 1 if cnmf_complete else 100
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
-            if not os.path.isfile(f'{cnmf_outdir}/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)):
+            norm_counts = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix)) + f'/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)
+            log.log(f'Looking for {norm_counts} to determine if cNMF preprocessing is complete')
+            if not os.path.isfile(norm_counts):
                 cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
         if args.scired: scired_submitter.add(cmd + ' --scired')

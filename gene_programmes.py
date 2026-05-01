@@ -250,6 +250,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, force, savedir = None):
         loadings = loadings.T
+        cell_type = [x for x in cell_type if x in adata.obs.columns]
 
         plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
         os.makedirs(plot_dir, exist_ok = True)
@@ -268,6 +269,21 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
                 cell_type[0].lower(), time_keys = adata.obs.columns.intersection(time_columns), force = force)
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
+        # cell type descriptive stats
+        if len(cell_type) > 0:
+            out_celltype = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_celltype_stats.txt'
+            cell_type_mean = []; cell_type_sd = []
+            for ct in cell_type:
+                cell_type_mean.append(usages.groupby(adata.obs[ct]).mean().assign(annot = ct).reset_index(names = 'cell_type'))
+                cell_type_sd.append(usages.groupby(adata.obs[ct]).std().assign(annot = ct).reset_index(names = 'cell_type'))
+            cell_type_mean = pd.concat(cell_type_mean, axis = 0).set_index(['annot','cell_type'])
+            cell_type_mean.columns = [f'F{col}_mean' for col in cell_type_mean.columns]
+            cell_type_sd = pd.concat(cell_type_sd, axis = 0).set_index(['annot','cell_type'])
+            cell_type_sd.columns = [f'F{col}_sd' for col in cell_type_sd.columns]
+            cell_type_stats = pd.concat([cell_type_mean, cell_type_sd], axis = 1).sort_index(axis = 1, key = lambda x: x.str.extract(r'F(\d+)_')[0].astype(int))
+            cell_type_stats.to_csv(out_celltype, sep = '\t', index = True, header = True)
+            log.log(f'cNMF cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_cnmf')
+            
         # factor importance scoring
         out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
         out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
