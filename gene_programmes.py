@@ -356,7 +356,7 @@ def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter
         projection_dataset = projection[0][0]
         projection_prefix = projection[0][1]
         prefix = f'{prefix}_hvg_{projection_dataset}_{projection_prefix}' if projection_dataset not in projection_prefix else f'{prefix}_hvg_{projection_prefix}'
-    outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix), k = 10, dt = '0_1')
+    outdir = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix))
     n_spectra_complete = 0
     if not os.path.isdir(f'{outdir}/cnmf_tmp'): os.makedirs(f'{outdir}/cnmf_tmp')
     for f in os.listdir(f'{outdir}/cnmf_tmp'):
