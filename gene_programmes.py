@@ -262,7 +262,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, force, savedir = None):
         loadings = loadings.T
-        cell_type = [x for x in cell_type if x in adata.obs.columns]
+        cell_type = [x.lower() for x in cell_type if x in adata.obs.columns]
+        adata.obs.columns = adata.obs.columns.str.lower()
 
         plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
         os.makedirs(plot_dir, exist_ok = True)
@@ -280,7 +281,6 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf', warning = True)
 
         # pseudotime regression plots
-        adata.obs.columns = adata.obs.columns.str.lower()
         time_columns = list(set(['age','time','pseudotime'] + time_key))
         if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
             factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', 
