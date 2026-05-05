@@ -371,7 +371,7 @@ def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_ite
     
     # forcibly update cnmf iteration parameters
     import cnmf
-    cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
+    cnmf_obj = cnmf.cNMF(output_dir = os.path.dirname(outdir), name = prefix)
     replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
         ks = n_components, n_iter = n_iter, random_state_seed = seed,
         beta_loss = 'frobenius', init = 'random', alpha_usage = 0.0, alpha_spectra = 0.0, max_iter = 1000
