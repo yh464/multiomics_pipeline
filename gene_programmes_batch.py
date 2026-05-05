@@ -14,7 +14,8 @@ from _utils.path import project
 proj = project()
 
 from _utils.slurm import array_submitter, add_slurm_args_dec
-from gene_programmes import check_cnmf_completed, add_cmd_args
+from gene_programmes import check_cnmf_incomplete, add_cmd_args
+add_cmd_args = add_slurm_args_dec(add_cmd_args)
 
 def get_obs_cols(dataset, prefix, default, input_string = 'cell type'):
     import scanpy as sc
@@ -69,10 +70,10 @@ def main(args):
         if args.force: cmd += ' --force'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
-            cnmf_complete = check_cnmf_completed(dataset, prefix, 
+            n_cnmf_incomplete = check_cnmf_incomplete(dataset, prefix, 
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]),
                 projection = args.projection)
-            n_jobs = 1 if cnmf_complete else 100
+            n_jobs = max(1, min(100, n_cnmf_incomplete)) # use up to 100 workers
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
             norm_counts = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix, k = 10, dt = '0_1')) + \
                 f'/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)
@@ -85,8 +86,6 @@ def main(args):
     cnmf_submitter.submit()
     scired_submitter.submit()
     spectra_submitter.submit()
-
-add_cmd_args = add_slurm_args_dec(add_cmd_args)
 
 if __name__ == '__main__':
     import argparse

@@ -211,7 +211,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
-    if not check_cnmf_completed(dataset, prefix, n_components = n_components, n_iter = n_iter):
+    if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter):
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
     
@@ -351,7 +351,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
 
-def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = []):
+def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = []):
     '''check if cNMF has been completed for given dataset / prefix'''
     proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
     projection = proj.find_h5ad(projection, long = True)
@@ -367,9 +367,9 @@ def check_cnmf_completed(dataset, prefix, n_components = range(5, 41, 1), n_iter
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
     if n_spectra_complete < len(n_components)*n_iter:
         log.log(f'{n_spectra_complete} / {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
-        return False
+        return 0
     log.log(f'All {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
-    return True
+    return len(n_components) * n_iter - n_spectra_complete
 
 def run_spectra(dataset, prefix, outdir, cell_type):
     '''
