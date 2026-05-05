@@ -367,8 +367,7 @@ def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_ite
             if fnmatch(f, f'{prefix}.spectra.k_{k}.iter_*.df.npz'): n_spectra_complete += 1
     if n_spectra_complete < len(n_components)*n_iter:
         log.log(f'{n_spectra_complete} / {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
-        return 0
-    log.log(f'All {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
+    else: log.log(f'All {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
     return len(n_components) * n_iter - n_spectra_complete
 
 def run_spectra(dataset, prefix, outdir, cell_type):
