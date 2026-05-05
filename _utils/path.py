@@ -162,7 +162,7 @@ class project():
             log.error(f'File type {ftype} not found in path config')
         pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
         for key, value in kwargs.items():
-            pattern = pattern.replace(f'${key}', str(value))
+            pattern = pattern.replace(f'${key}.', str(value)+'.').replace(f'${key}_', str(value)+'_')
         os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
         
         # if there are still placeholders, give a warning if file is not uniquely defined after replacing placeholders with wildcards

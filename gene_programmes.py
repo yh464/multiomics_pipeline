@@ -207,8 +207,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
         cnmf_obj.update_nmf_iter_params()
         log.log('Saved cNMF runtime parameters', calling_file = 'run_cnmf')
-    else: time.sleep(5) # this step is fast enough, no time limit needed
-    
+    else: time.sleep(15) # this step is fast enough, no time limit needed 
+
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
     if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter):
@@ -351,7 +351,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
 
-def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = []):
+def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = [], seed = 19260817):
     '''check if cNMF has been completed for given dataset / prefix'''
     proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
     projection = proj.find_h5ad(projection, long = True)
@@ -368,6 +368,16 @@ def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_ite
     if n_spectra_complete < len(n_components)*n_iter:
         log.log(f'{n_spectra_complete} / {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
     else: log.log(f'All {len(n_components)*n_iter} cNMF iterations completed for {dataset}/{prefix}', calling_file = 'check_cnmf_completed')
+    
+    # forcibly update cnmf iteration parameters
+    import cnmf
+    cnmf_obj = cnmf.cNMF(output_dir = outdir, name = prefix)
+    replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
+        ks = n_components, n_iter = n_iter, random_state_seed = seed,
+        beta_loss = 'frobenius', init = 'random', alpha_usage = 0.0, alpha_spectra = 0.0, max_iter = 1000
+    )
+    cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
+    cnmf_obj.update_nmf_iter_params()
     return len(n_components) * n_iter - n_spectra_complete
 
 def run_spectra(dataset, prefix, outdir, cell_type):
