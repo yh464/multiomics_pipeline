@@ -71,7 +71,7 @@ def main(args):
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
             n_cnmf_incomplete = check_cnmf_incomplete(dataset, prefix, 
-                range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]),
+                range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]) if len(args.cnmf_components) == 3 else args.cnmf_components,
                 projection = args.projection)
             n_jobs = max(1, min(100, n_cnmf_incomplete)) # use up to 100 workers
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files

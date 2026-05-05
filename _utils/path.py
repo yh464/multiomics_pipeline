@@ -180,11 +180,11 @@ class project():
             # search for files matching the pattern
             dir_pattern = os.path.dirname(pattern)
             files = [f for f in os.listdir(dir_pattern) if fnmatch(f, os.path.basename(pattern))]
-            if len(files) != 1:
+            if len(files) > 1:
                 log.warn(f'Variables are not fully defined for {pattern}: '+ ', '.join(missing_placeholders))
                 log.warn(f'Found {len(files)} files matching the pattern: ')
                 for f in files: log.warn(f'    {f}')
-            else: pattern = os.path.join(dir_pattern, files[0])
+            elif len(files) == 1: pattern = os.path.join(dir_pattern, files[0])
         return pattern
 
     def to_pathname_multi(self, ftype, *datasets, **kwargs):
