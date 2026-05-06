@@ -130,6 +130,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
             embedding_args.append((adata, scores[col], emb_key, figname))
+        if len(embedding_args) == 0: continue
         with Pool(processes=min(len(embedding_args),16)) as pool:
             tqdm(pool.imap(_factor_embedding_single, embedding_args), total=len(embedding_args), desc = f'Plotting factors in {emb_key} space')
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
@@ -158,6 +159,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
         scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
         timereg_args = [(scores_tmp, time_key, col, cell_type_key, time_xlabel, out_fig, force) for col in score_cols]
+        if len(timereg_args) == 0: continue
         with Pool(processes=min(len(timereg_args),16)) as pool:
             tqdm(pool.imap(_factor_timereg_single, timereg_args), total=len(timereg_args), desc = f'Plotting factor regression with {time_key}')
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
