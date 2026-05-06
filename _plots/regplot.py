@@ -92,7 +92,7 @@ def temporal_regplot(
         sns.regplot(
             data = df,
             x = x, y = y, order = order, 
-            scatter_kws = dict(s = s, alpha = alpha, color = '0.8', edgecolor = 'none'),
+            scatter_kws = dict(s = s, alpha = alpha, color = '0.8', edgecolor = 'none', rasterized = True),
             line_kws = dict(color = '0.8', linewidth = 2),
             ax = ax
         )
@@ -160,14 +160,14 @@ def temporal_regplot(
         sns.regplot(
             data = cat_df,
             x = x, y = y, order = order,
-            scatter_kws = dict(s = s, alpha = alpha, color = palette[cat], edgecolor = 'none'),
+            scatter_kws = dict(s = s, alpha = alpha, color = palette[cat], edgecolor = 'none', rasterized = True),
             line_kws = dict(color = palette[cat], linewidth = 2),
             ax = ax
         )
     # plot clipped tails with the same colour but more transparent
     if df_excluded.shape[0] > 0:
         for cat, cat_df in df_excluded.groupby(hue, observed = True):
-            sns.scatterplot(cat_df, x = x, y = y, color = palette[cat], s = s, alpha = alpha / 2, edgecolor = 'none', ax = ax)
+            sns.scatterplot(cat_df, x = x, y = y, color = palette[cat], s = s, alpha = alpha / 2, edgecolor = 'none', ax = ax, rasterized = True)
 
     # annotate correlation values for each category
     if xlabel_groups:

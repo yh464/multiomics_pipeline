@@ -163,6 +163,7 @@ class project():
         pattern = f'{self.project_root}/' + self.config[ftype].replace('$dataset', dataset).replace('$prefix', prefix)
         for key, value in kwargs.items():
             pattern = pattern.replace(f'${key}.', str(value)+'.').replace(f'${key}_', str(value)+'_')
+            pattern = '/'.join([part if part != f'${key}' else str(value) for part in pattern.split('/')])
         os.makedirs(os.path.dirname(pattern), exist_ok = True) # automatically create directory when pathname is requested
         
         # if there are still placeholders, give a warning if file is not uniquely defined after replacing placeholders with wildcards
@@ -171,9 +172,11 @@ class project():
             start = pattern.find('$')
             end_dot = pattern.find('.', start)
             end_underscore = pattern.find('_', start)
+            end_slash = pattern.find('/', start)
             if end_dot < 0: end_dot = len(pattern)
             if end_underscore < 0: end_underscore = len(pattern)
-            end = min(end_dot, end_underscore)
+            if end_slash < 0: end_slash = len(pattern)
+            end = min(end_dot, end_underscore, end_slash)
             missing_placeholders.append(pattern[start:end])
             pattern = pattern[:start] + '*' + pattern[end:]
         if missing_placeholders:
