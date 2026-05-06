@@ -48,31 +48,40 @@ def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
 def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     # FCAT analysis for factor importance
     import sciRED.ensembleFCA
+    if out_tabular.find('$celltype') == -1: out_tabular = out_tabular.replace('.txt', '_$celltype.txt')
+    if out_fig.find('$celltype') == -1: out_fig = out_fig.replace('.pdf', '_$celltype.pdf')
+
     if isinstance(scores, pd.DataFrame): scores = scores.values # FCAT function accepts numpy array as input
     fcat_mat = []
     for col in factors_to_explain:
         if col not in adata.obs.columns:
-            log.log(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'factor_importance', warning = True)
+            log.warn(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'factor_importance')
             continue
         elif (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object) and adata.obs[col].nunique() > 1:
-            fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
-                scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
-            fcat_col['explained_factor'] = fcat_col.index
-            fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
-            # the ensembleFCA function will automatically name the column as 'scired_factor' even if the input is not from sciRED
-            fcat_col.insert(0, 'explained_group', col)
-            fcat_col.insert(2, 'xlabel', 'factor')
+            if adata.obs[col].nunique() > 30:
+                log.warn(f'Factor to explain {col} has more than 30 categories, skipping.', calling_file = 'factor_importance')
+                continue
+            if not os.path.isfile(out_tabular.replace('$celltype', col)):
+                fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
+                    scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
+                fcat_col['explained_factor'] = fcat_col.index
+                fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
+                # the ensembleFCA function will automatically name the column as 'scired_factor' even if the input is not from sciRED
+                fcat_col.insert(0, 'explained_group', col)
+                fcat_col.insert(2, 'xlabel', 'factor')
+                fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_col['fcat_value'].dropna().values)
+                fcat_col['significance'] = fcat_col['fcat_value'] >= fcat_thr
+                fcat_col = fcat_col.rename(columns={'scired_factor': 'factor'})
+                fcat_col.to_csv(out_tabular.replace('$celltype', col), sep = '\t', index = True, header = True)
+            else: fcat_col = pd.read_table(out_tabular.replace('$celltype', col), index_col = 0)
+            fig = corr_heatmap(fcat_col, sort = False, sig_col = 'significance')
+            fig.savefig(out_fig.replace('$celltype', col), bbox_inches = 'tight')
+            plt.close(fig)
+            log.log(f'Factor importance for {col} completed, saving to {out_fig.replace("$celltype", col)}', calling_file = 'factor_importance')
             fcat_mat.append(fcat_col)
         else:
-            log.log(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'factor_importance', warning = True)
-    if len(fcat_mat) == 0: raise ValueError('No valid factors to explain provided.')
+            log.warn(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'factor_importance')
     fcat_mat = pd.concat(fcat_mat, axis = 0)
-    fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_mat['fcat_value'].dropna().values)
-    fcat_mat['significance'] = fcat_mat['fcat_value'] >= fcat_thr
-    fcat_mat.rename(columns={'scired_factor': 'factor'}).to_csv(out_tabular, sep = '\t', index = True, header = True)
-    fig = corr_heatmap(fcat_mat, sort = False, sig_col = 'significance')
-    fig.savefig(out_fig, bbox_inches = 'tight')
-    plt.close(fig)
     return fcat_mat
 
 def factor_celltype_stats(scores, adata, cell_type_key, out_tabular):
@@ -272,8 +281,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
         os.makedirs(plot_dir, exist_ok = True)
         out_celltype = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_celltype_stats.txt'
-        out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.txt'
-        out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat.pdf'
+        out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat_$celltype.txt'
+        out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat_$celltype.pdf'
         out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
         out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
         out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
@@ -448,8 +457,8 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     out_loading = f'{outdir}/{prefix}_scired_loadings.txt'
     out_scores = f'{outdir}/{prefix}_scired_scores.txt'
     out_celltype = f'{outdir}/{prefix}_scired_celltype_stats.txt'
-    out_fcat = f'{outdir}/{prefix}_scired_fcat.txt'
-    out_fcat_fig = f'{outdir}/{prefix}_scired_fcat.pdf'
+    out_fcat = f'{outdir}/{prefix}_scired_fcat_$celltype.txt'
+    out_fcat_fig = f'{outdir}/{prefix}_scired_fcat_$celltype.pdf'
     out_corr = f'{outdir}/{prefix}_scired_correlation.txt'
     out_corr_fig = f'{outdir}/{prefix}_scired_correlation.pdf'
     out_interpretability = f'{outdir}/{prefix}_scired_interpretability.txt'
