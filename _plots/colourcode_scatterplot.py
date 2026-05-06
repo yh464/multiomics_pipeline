@@ -24,7 +24,7 @@ def _add_rep_axis(fig, rep = 'UMAP'):
   repax.set_xlabel(f'{rep}1', fontsize = 8); repax.set_ylabel(f'{rep}2', fontsize = 8)
   return fig
 
-def scatterplot_noaxis(x, y, v, palette = None, s = 0.1, rep = 'UMAP', vname = '', vmin = None, vmax = None, **kwargs):
+def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 0.1, rep = 'UMAP', vname = '', vmin = None, vmax = None, **kwargs):
   '''
   Scatterplot without axes
   Input:
@@ -35,6 +35,7 @@ def scatterplot_noaxis(x, y, v, palette = None, s = 0.1, rep = 'UMAP', vname = '
     all **kwargs are passed to sns.scatterplot()
   '''
   df = pd.DataFrame(dict(x = x, y = y, v = v)).dropna()
+  if not full and df.shape[0] > 100000: df = df.sample(100000, random_state = 0) # for large datasets, sample points to speed up plotting
 
   # colour palette
   if palette != None:

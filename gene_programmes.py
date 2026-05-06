@@ -13,7 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os, time
 from fnmatch import fnmatch
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Pool
 from tqdm import tqdm
 from _utils.logger import logger
 log = logger()
@@ -108,6 +108,11 @@ def factor_correlation(loadings, out_tabular, out_fig):
     plt.close(fig)
     return corr_mat
 
+def _factor_embedding_single(input_args):
+    adata, v, rep, figname = input_args
+    fig = scatterplot_adata(adata, v = v, rep = rep)
+    fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
+    plt.close(fig)
 def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force = False):
     log.log(f'Plotting cell-level scores in embedding space: ' + ', '.join(embedding_key), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
@@ -120,14 +125,28 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding', warning = True)
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
-        for col in tqdm(score_cols, desc = 'Plotting factor embedding regression'):
+        embedding_args = []
+        for col in score_cols:
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
-            fig = scatterplot_adata(adata, v = scores[col], rep = emb_key)
-            fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
-            plt.close(fig)
+            embedding_args.append((adata, scores[col], emb_key, figname))
+        with Pool(processes=min(len(embedding_args),16)) as pool:
+            tqdm(pool.imap(_factor_embedding_single, embedding_args), total=len(embedding_args), desc = f'Plotting factors in {emb_key} space')
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
 
+def _factor_timereg_single(input_args):
+    scores_tmp, time_key, col, cell_type_key, time_xlabel, out_fig, force = input_args
+    fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
+    fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
+    if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: return
+    if not os.path.isfile(fig_1order) or force:
+        fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, xlabel = time_xlabel)
+        fig.savefig(fig_1order, bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
+    if not os.path.isfile(fig_2order) or force:
+        fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
+        fig.savefig(fig_2order, bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
 def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
     log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_keys), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
@@ -137,19 +156,10 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
     score_cols = scores.columns.tolist()
     for time_key in time_keys:
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
-        scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
-        for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
-            fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
-            fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
-            if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
-            if not os.path.isfile(fig_1order) or force:
-                fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, xlabel = time_xlabel)
-                fig.savefig(fig_1order, bbox_inches = 'tight', dpi = 400)
-                plt.close(fig)
-            if not os.path.isfile(fig_2order) or force:
-                fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
-                fig.savefig(fig_2order, bbox_inches = 'tight', dpi = 400)
-                plt.close(fig)
+        scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()
+        timereg_args = [(scores_tmp, time_key, col, cell_type_key, time_xlabel, out_fig, force) for col in score_cols]
+        with Pool(processes=min(len(timereg_args),16)) as pool:
+            tqdm(pool.imap(_factor_timereg_single, timereg_args), total=len(timereg_args), desc = f'Plotting factor regression with {time_key}')
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, 
