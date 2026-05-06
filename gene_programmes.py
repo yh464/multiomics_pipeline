@@ -123,7 +123,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
         for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
-            fig = scatterplot_adata(adata, v = col, rep = emb_key, full = False)
+            fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
             fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
