@@ -110,7 +110,7 @@ def factor_correlation(loadings, out_tabular, out_fig):
 
 def _factor_embedding_single(input_args):
     x, y, v, rep, figname = input_args
-    fig = scatterplot_noaxis(x, y, v, rep)
+    fig = scatterplot_noaxis(x, y, v, rep = rep)
     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
     plt.close(fig)
 def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force = False):
