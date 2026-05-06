@@ -48,7 +48,7 @@ def _generate_colour_palette(groups):
 
 def temporal_regplot(
     df,
-    x, y, hue = None, clip_tail = 0.025,
+    x, y, hue = None, *, clip_tail = 0.025,
     xlabel = False, ylabel = None, xlabel_groups = True,
     s = 0.5, alpha = 0.2, 
     order = 1, annotate_corr = True
