@@ -120,7 +120,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding', warning = True)
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
-        for col in tqdm(score_cols, desc = 'Plotting factor embedding regression'):
+        for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
             fig = scatterplot_adata(adata, v = scores[col], rep = emb_key)
@@ -138,7 +138,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
     for time_key in time_keys:
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
         scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
-        for col in tqdm(score_cols, desc = 'Plotting factor temporal regression'):
+        for col in tqdm(score_cols, desc = f'Plotting factor temporal regression for {time_key}'):
             fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
             fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
             if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
