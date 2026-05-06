@@ -24,7 +24,7 @@ def _add_rep_axis(fig, rep = 'UMAP'):
   repax.set_xlabel(f'{rep}1', fontsize = 8); repax.set_ylabel(f'{rep}2', fontsize = 8)
   return fig
 
-def scatterplot_noaxis(x, y, v, *, full = False, palette = None, s = 0.1, rep = 'UMAP', vname = '', vmin = None, vmax = None, **kwargs):
+def scatterplot_noaxis(x, y, v, *, full = False, *, full = True, palette = None, s = 0.1, rep = 'UMAP', vname = '', vmin = None, vmax = None, **kwargs):
   '''
   Scatterplot without axes
   Input:
