@@ -20,7 +20,7 @@ log = logger()
 from _utils.path import project
 proj = project()
 from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
-from _plots.colourcode_scatterplot import scatterplot_adata
+from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
 from _plots.regplot import temporal_regplot
 
 def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
@@ -109,8 +109,8 @@ def factor_correlation(loadings, out_tabular, out_fig):
     return corr_mat
 
 def _factor_embedding_single(input_args):
-    adata, v, rep, figname = input_args
-    fig = scatterplot_adata(adata, v = v, rep = rep)
+    x, y, v, rep, figname = input_args
+    fig = scatterplot_noaxis(x, y, v, rep)
     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
     plt.close(fig)
 def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force = False):
@@ -129,7 +129,8 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
         for col in score_cols:
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
-            embedding_args.append((adata, scores[col], emb_key, figname))
+            embedding_args.append((adata.obsm[emb_key][:, 0], adata.obsm[emb_key][:, 1], scores[col], 
+                emb_key.replace('X_', '').upper().replace('TSNE','tSNE'), figname))
         if len(embedding_args) == 0: continue
         with Pool(processes=min(len(embedding_args),16)) as pool:
             list(tqdm(pool.imap(_factor_embedding_single, embedding_args), total=len(embedding_args), desc = f'Plotting factors in {emb_key} space'))
