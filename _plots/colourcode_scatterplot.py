@@ -61,7 +61,8 @@ def scatterplot_noaxis(x, y, v, *, full = False, palette = None, s = 0.1, rep = 
   # main plot
   fig = plt.figure(figsize = (5.3,5))
   ax = fig.add_axes((0.3/5.3, 0.3/5, 4.4/5.3, 4.4/5))
-  sns.scatterplot(data = df, x = 'x', y = 'y', hue = 'v', palette = use_palette, s = s, ax = ax, edgecolor = None, linewidth = 0, legend = legend, **kwargs)
+  sns.scatterplot(data = df, x = 'x', y = 'y', hue = 'v', palette = use_palette, s = s, ax = ax, edgecolor = None, linewidth = 0, 
+      legend = legend, rasterized = True, **kwargs)
   ax.axis('off')
   ax.set_aspect('equal')
   
