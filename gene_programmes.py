@@ -29,7 +29,7 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     adata = sc.read_h5ad(h5ad_in,'r')
     adata = adata[:, [x for x in gene_subset if x in adata.var_names]]
     sc.write(h5ad_out, adata)
-    adata.close()
+    adata.file.close()
 
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
     from _utils.enrichr import enrichr_continuous
