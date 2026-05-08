@@ -220,7 +220,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
-    if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter):
+    if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter)[0]:
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
     
@@ -387,7 +387,9 @@ def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_ite
     )
     cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
     cnmf_obj.update_nmf_iter_params()
-    return len(n_components) * n_iter - n_spectra_complete
+    prep_complete = os.path.isfile(cnmf_obj.paths['normalized_counts']) and os.path.isfile(cnmf_obj.paths['tpm']) and \
+        os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) and os.access(cnmf_obj.paths['tpm'], os.R_OK)
+    return len(n_components) * n_iter - n_spectra_complete, not prep_complete
 
 def run_spectra(dataset, prefix, outdir, cell_type):
     '''

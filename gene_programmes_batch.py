@@ -70,16 +70,12 @@ def main(args):
         if args.force: cmd += ' --force'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
-            n_cnmf_incomplete = check_cnmf_incomplete(dataset, prefix, 
+            n_cnmf_incomplete, norm_counts_incomplete = check_cnmf_incomplete(dataset, prefix, 
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]) if len(args.cnmf_components) == 3 else args.cnmf_components,
                 projection = args.projection)
             n_jobs = max(1, min(100, n_cnmf_incomplete)) # use up to 100 workers
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
-            norm_counts = os.path.dirname(proj.to_pathname('programmes_cnmf', dataset, prefix, k = 10, dt = '0_1')) + \
-                f'/cnmf_tmp/{prefix}.norm_counts.h5ad'.replace('$dataset', dataset).replace('$prefix', prefix)
-            log.log(f'Looking for {norm_counts} to determine if cNMF preprocessing is complete')
-            if not os.path.isfile(norm_counts):
-                cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
+            if norm_counts_incomplete: cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
         if args.scired: scired_submitter.add(cmd + ' --scired')
         if args.spectra: spectra_submitter.add(cmd + ' --spectra')
