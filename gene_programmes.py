@@ -180,7 +180,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         os.makedirs(tmpdir, exist_ok = True)
         projected_h5ad = f'{tmpdir}/{dataset}_{new_prefix}.h5ad'
         projection_genes = os.path.dirname(proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix)) + f'/{projection_prefix}.overdispersed_genes.txt'
-        if worker_id == 0 and not os.path.isfile(projected_h5ad):
+        if worker_id <= 0 and not os.path.isfile(projected_h5ad):
             subset_h5ad(h5ad_raw, projected_h5ad, projection_genes)
         elif not os.path.isfile(projected_h5ad) or not os.access(projected_h5ad, os.R_OK):
             log.log(f'Waiting for projected h5ad file to be generated at {projected_h5ad}', calling_file = 'run_cnmf')
