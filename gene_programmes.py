@@ -58,7 +58,8 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
         if col not in adata.obs.columns:
             log.warn(f'Factor to explain {col} not found in adata.obs, skipping.', calling_file = 'factor_importance')
             continue
-        elif (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or adata.obs[col].dtype == object) and adata.obs[col].nunique() > 1:
+        elif (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or isinstance(adata.obs[col], str
+                ) or adata.obs[col].dtype == object) and adata.obs[col].nunique() > 1:
             if adata.obs[col].nunique() > 30:
                 log.warn(f'Factor to explain {col} has more than 30 categories, skipping.', calling_file = 'factor_importance')
                 continue
@@ -82,6 +83,9 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
             fcat_mat.append(fcat_col)
         else:
             log.warn(f'Factor to explain {col} is not categorical, skipping.', calling_file = 'factor_importance')
+    if len(fcat_mat) == 0:
+        log.warn('No valid factors to explain, returning empty DataFrame.', calling_file = 'factor_importance')
+        return pd.DataFrame()
     fcat_mat = pd.concat(fcat_mat, axis = 0)
     return fcat_mat
 
@@ -187,8 +191,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             log.log(f'Waiting for projected h5ad file to be generated at {projected_h5ad}', calling_file = 'run_cnmf')
             time.sleep(60)
         log.log(f'Re-fitting cNMF using highly variable genes from {projection_dataset}/{projection_prefix}', calling_file = 'run_cnmf')
-        prefix = new_prefix
-        h5ad_raw = projected_h5ad
+        prefix_old = prefix; h5ad_old = h5ad_raw
+        prefix = new_prefix; h5ad_raw = projected_h5ad
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
 
     import cnmf
