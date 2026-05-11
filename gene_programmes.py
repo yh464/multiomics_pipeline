@@ -27,7 +27,7 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     import scanpy as sc
     if type(gene_subset) == str and os.path.isfile(gene_subset): gene_subset = open(gene_subset).read().splitlines()
     adata = sc.read_h5ad(h5ad_in,'r')
-    adata = adata[:, [x for x in gene_subset if x in adata.var_names]]
+    adata = adata[:, [x for x in gene_subset if x in adata.var_names and adata[:,x].to_memory().X.sum() > 0]] # subset to genes in gene_subset that are present in adata and have non-zero counts
     sc.write(h5ad_out, adata)
     adata.file.close()
 
@@ -342,7 +342,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k_optim, dt = density_threshold_str)
             os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
             if not os.path.isfle(projected_usages_file) or force:
-                adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
+                adata_normalised = sc.read_h5ad(cnmf_obj.paths['tpm'])
                 projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
                 projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
                 nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
