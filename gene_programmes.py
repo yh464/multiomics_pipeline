@@ -27,7 +27,8 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     import scanpy as sc
     if type(gene_subset) == str and os.path.isfile(gene_subset): gene_subset = open(gene_subset).read().splitlines()
     adata = sc.read_h5ad(h5ad_in,'r')
-    adata = adata[:, [x for x in gene_subset if x in adata.var_names and adata[:,x].to_memory().X.sum() > 0]] # subset to genes in gene_subset that are present in adata and have non-zero counts
+    adata = adata[:, [x for x in gene_subset if x in adata.var_names]].to_memory() # subset to genes in gene_subset that are present in adata
+    adata = adata[:, adata.X.sum(axis = 0) > 0] # subset to genes with at least one non-zero count
     sc.write(h5ad_out, adata)
     adata.file.close()
 
