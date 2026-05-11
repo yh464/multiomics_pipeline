@@ -60,8 +60,8 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
             continue
         elif (isinstance(adata.obs[col].dtype, pd.CategoricalDtype) or isinstance(adata.obs[col], str
                 ) or adata.obs[col].dtype == object) and adata.obs[col].nunique() > 1:
-            if adata.obs[col].nunique() > 30:
-                log.warn(f'Factor to explain {col} has more than 30 categories, skipping.', calling_file = 'factor_importance')
+            if adata.obs[col].nunique() > 100:
+                log.warn(f'Factor to explain {col} has more than 100 categories, skipping.', calling_file = 'factor_importance')
                 continue
             if not os.path.isfile(out_tabular.replace('$celltype', col)):
                 fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
