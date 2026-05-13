@@ -25,13 +25,15 @@ def main(args):
         adata = sc.read_h5ad(h5ad_raw, 'r')
         if args.cell_type == ['cell_type']: selected_cell_types = get_metadata_cols(adata = adata, default = args.cell_type)
         else: selected_cell_types = args.cell_type
-        if all([x in adata.obsm_keys() for x in args.embedding]):
+        if all([x in adata.obsm.keys() for x in args.embedding]):
             selected_embeddings = args.embedding
         else: selected_embeddings = get_embedding_keys(adata = adata, default = args.embedding)
         for cell_type_col in tqdm(selected_cell_types, desc = f'Processing {dataset}/{prefix}'):
+            out_fig = f'{args.out}/{dataset}_{prefix}_{cell_type_col}_legend.png' if prefix.find(dataset) == -1 else \
+                f'{args.out}/{prefix}_{cell_type_col}_legend.png'
+            if not args.force and proj.exists(out_fig): continue
             scatterplot_adata(adata, v = adata.obs[cell_type_col], rep = selected_embeddings[0])
-            plt.savefig(f'{args.out}/{dataset}_{prefix}_{cell_type_col}_legend.png' if prefix.find(dataset) == -1 else \
-                        f'{args.out}/{prefix}_{cell_type_col}_legend.png', dpi = 400)
+            plt.savefig(out_fig, dpi = 400)
             plt.close()
     
 if __name__ == '__main__':
@@ -43,5 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--embedding', nargs = '+', default = ['X_umap'], 
         help = 'Embedding(s) in adata.obsm to use for scatterplot coordinates. Default: X_umap. If not available, you will be prompted to select.')
     parser.add_argument('--out', default = '../legends', help = 'Output directory for legends')
+    parser.add_argument('-f', '--force', action = 'store_true', help = 'Force overwrite')
     args = parser.parse_args()
+    logger.splash(args)
     main(args)

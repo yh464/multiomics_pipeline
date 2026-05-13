@@ -20,7 +20,7 @@ def get_metadata_cols(dataset = None, prefix = None, default = [], input_string 
     df = adata.obs if axis == 'obs' else adata.var
     default = [x for x in default if x in df.columns]
     # take keyboard input to select cell type columns
-    log.log(f'Following columns are found in {dataset}/{prefix} metadata:')
+    log.log('Following columns are found:')
     for i, col in enumerate(df.columns):
         log.log(f'    {i}: {col}')
     selected_cols = input(f'Enter the column numbers for {input_string}, separated by space: \n' + str(default) + ' ').strip()
@@ -34,12 +34,12 @@ def get_metadata_cols(dataset = None, prefix = None, default = [], input_string 
 
 def get_embedding_keys(dataset = None, prefix = None, default = [], adata = None):
     if adata is None: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
-    default = [x for x in default if x in adata.obsm_keys()]
-    log.log(f'Following embeddings are found in {dataset}/{prefix} obsm:')
-    for i, key in enumerate(adata.obsm_keys()):
+    default = [x for x in default if x in adata.obsm.keys()]
+    log.log('Following embeddings are found:')
+    for i, key in enumerate(adata.obsm.keys()):
         log.log(f'    {i}: {key}')
     selected_keys = input(f'Enter the column numbers for embeddings to use, separated by space: \n' + str(default) + ' ').strip()
-    selected_keys = [adata.obsm_keys()[int(x)] for x in selected_keys.split()]
+    selected_keys = [adata.obsm.keys()[int(x)] for x in selected_keys.split()]
     if len(selected_keys) == 0: selected_keys = default
     if len(selected_keys) == 0: log.warn('No valid embedding selected/found, please check your input and dataset obsm')
     print()
