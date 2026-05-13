@@ -7,6 +7,7 @@ Version 1: 2026-05-13
 A quick utility to generate cell type legends for scatterplots
 '''
 
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scanpy as sc
@@ -31,7 +32,7 @@ def main(args):
         for cell_type_col in tqdm(selected_cell_types, desc = f'Processing {dataset}/{prefix}'):
             out_fig = f'{args.out}/{dataset}_{prefix}_{cell_type_col}_legend.png' if prefix.find(dataset) == -1 else \
                 f'{args.out}/{prefix}_{cell_type_col}_legend.png'
-            if not args.force and proj.exists(out_fig): continue
+            if not args.force and os.path.exists(out_fig): continue
             scatterplot_adata(adata, v = adata.obs[cell_type_col], rep = selected_embeddings[0])
             plt.savefig(out_fig, dpi = 400)
             plt.close()
