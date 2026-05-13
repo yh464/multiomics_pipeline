@@ -47,5 +47,5 @@ if __name__ == '__main__':
     parser.add_argument('--out', default = '../legends', help = 'Output directory for legends')
     parser.add_argument('-f', '--force', action = 'store_true', help = 'Force overwrite')
     args = parser.parse_args()
-    logger.splash(args)
+    log.splash(args)
     main(args)
