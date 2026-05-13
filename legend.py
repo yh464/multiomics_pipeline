@@ -24,7 +24,9 @@ def main(args):
     for dataset, prefix in h5ad:
         h5ad_raw = proj.to_pathname('raw', dataset, prefix)
         adata = sc.read_h5ad(h5ad_raw, 'r')
-        if args.cell_type == ['cell_type']: selected_cell_types = get_metadata_cols(adata = adata, default = args.cell_type)
+        args.cell_type = [x for x in args.cell_type if x in adata.obs.columns]
+        args.embedding = [x for x in args.embedding if x in adata.obsm.keys()]
+        if args.cell_type in [['cell_type'], []]: selected_cell_types = get_metadata_cols(adata = adata, default = args.cell_type)
         else: selected_cell_types = args.cell_type
         if all([x in adata.obsm.keys() for x in args.embedding]):
             selected_embeddings = args.embedding
