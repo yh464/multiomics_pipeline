@@ -34,7 +34,7 @@ def main(args):
                 f'{args.out}/{prefix}_{cell_type_col}_legend.png'
             if not args.force and os.path.exists(out_fig): continue
             scatterplot_adata(adata, v = adata.obs[cell_type_col], rep = selected_embeddings[0])
-            plt.savefig(out_fig, dpi = 400)
+            plt.savefig(out_fig, dpi = 400, bbox_inches = 'tight')
             plt.close()
     
 if __name__ == '__main__':
