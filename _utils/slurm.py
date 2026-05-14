@@ -10,14 +10,13 @@ if slurm returns 'FAILED', some steps may still run normally
 CHECK LOG
 '''
 
-from logging import warning
+from .logger import logger
 import os
 import argparse
 import re
 import warnings
 import math
 from hashlib import sha256
-from .logger import logger
 _logger = logger()
 
 class array_submitter():
@@ -53,11 +52,10 @@ class array_submitter():
                  log = '/home/yh464/rds/rds-rb643-ukbiobank2/Data_Users/yh464/logs',
                  tmpdir = '/home/yh464/rds/rds-rb643-ukbiobank2/Data_Users/yh464/temp',
                  parallel = 1, # number of parallel processes, useful for small jobs that need <1 CPU
-                 lim = warnings.warn(DeprecationWarning('Command limit will be automatically determined')), # deprecated
-                 arraysize = 200, # array size limit, default 2000 for CSD3 cluster, QOS max jobs 500
+                 arraysize = 500, # array size limit, default 2000 for CSD3 cluster, QOS max jobs 500
                  email = True,
                  wallclock = -1, # total time limit per file, default 240 minutes
-                 env = 'gentoolspy', # default working environment
+                 env = 'wd', # default working environment
                  modules = [], # modules to load
                  dependency = [], # dependent jobs
                  account = None,
@@ -80,12 +78,19 @@ class array_submitter():
         self._full_name = name
         if len(name) > 30:
             name = sha256(name.encode()).hexdigest()[:6] # truncate to 6S characters
-            warnings.warn(f'Job name too long, using random name {name}')
+            _logger.warn(f'Job name too long, using random name {name}')
         self.name = '_' + name.replace('/','_') + '_0'
         self.debug = debug
         self.intr = intr
         self.parallel = parallel
         
+        # initialise command counts
+        self._staged_cmd = []
+        self._blank = True
+        self._count = 0
+        self._nfiles = 0
+        self._jobid = 0
+
         # SLURM config
         self.partition = partition
         self.timeout = timeout
@@ -110,14 +115,15 @@ class array_submitter():
         self.modules = modules
         
         # limit of commands per file and wallclock limit
-        self.wallclock = max(timeout, 240) if timeout > 15 else 60
-        if wallclock > 0: self.wallclock = wallclock
+        self.wallclock = max(self.timeout, 240) if self.timeout > 15 else 60
+        if wallclock > 0: self.wallclock = max(self.timeout, wallclock)
         if account != None and account.find('sl2') >= 0: self.wallclock = min(self.wallclock, 2160)
         else: self.wallclock = min(self.wallclock, 720) 
 
         # read command line args before specifying limit of commands per file
         import __main__
         if 'args' in dir(__main__): self.config(**vars(__main__.args))
+        if not self.name.endswith('_0'): self.name += '_0' # ensure name ends with _0 for job array indexing
 
         # if GPU > 0, adjust the partition and charge account
         if self.n_gpu > 0: 
@@ -130,22 +136,15 @@ class array_submitter():
             self.n_cpu = cpu_avail[self.partition]
 
         # number of *parallel batches* of commands per file
-        self.lim = int(self.wallclock/timeout)
+        self.lim = int(self.wallclock/self.timeout)
         self.lim = max(self.lim, 1) # at least one command per file
-        _logger.log(f'Job name: {self.name}: Max {self.lim} batches * {self.parallel} commands per file, {self.arraysize} files per array job')
+        _logger.log(f'Max {self.lim} batches * {self.parallel} commands per file, {self.arraysize} files per array job for {self.name}')
+        self.array_cmd_limit = self.arraysize * self.lim * self.parallel
 
         # directories
         self.logdir = f'{log}/{self.name}'
         self.tmpdir = f'{tmpdir}/{self.name}'
 
-        # commands are staged up to an array size limit before a new job array is initialised
-        self.array_cmd_limit = self.arraysize * self.lim * self.parallel
-        self._staged_cmd = []
-        self._blank = True
-        self._count = 0
-        self._nfiles = 0
-        self._jobid = 0
-        
         # SLURM status properties
         self.submitted = False
         self._slurmid = []
@@ -342,7 +341,7 @@ class array_submitter():
         msg.append(f'    Path:       {self.tmpdir}')
         msg.append(f'    Log:        {self.logdir}')
         msg.append(f'    Partition:  {self.partition}')
-        msg.append(f'    Timeout:    {self.timeout * math.ceil(self._count / self.parallel)} minutes')
+        msg.append(f'    Timeout:    {self.timeout * self._count} minutes')
         msg.append(f'    CPUs:       {n_cpu}')
         if self.n_gpu > 0:
             msg.append(f'    GPUs:       {self.n_gpu}')
@@ -356,8 +355,13 @@ class array_submitter():
     # submits a single job array
     def _submit_single(self):
         if self.debug: self._print(); self.submitted = True; return # debug mode -> print only
-        if self.intr: os.system(f'for x in {self.tmpdir}/*.sh; do bash $x; done'); return
-        time = self.timeout * math.ceil(self._count / self.parallel)
+        if self.intr: 
+            for x in os.listdir(self.tmpdir):
+                if x.find('wrap') >= 0: continue
+                _logger.log(f'Running interactively: {x}')
+                os.system(f'bash {self.tmpdir}/{x}')
+            return
+        time = self.timeout * self._count
         time = min(time, 720)
         email = '--mail-type=ALL' if self.email else ''
         account = f'-A {self.account}' if self.account else ''
@@ -382,7 +386,7 @@ class array_submitter():
         Submits all commands to the cluster (SLURM manager)
         '''
         if self._blank: return
-        if self.submitted: warnings.warn(f'Job {self.name} already submitted'); return
+        if self.submitted: _logger.warn(f'Job {self.name} already submitted'); return
         self._dump()
         self._submit_single()
         self._staged_cmd = []
