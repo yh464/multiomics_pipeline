@@ -28,6 +28,6 @@ def main(args):
 if __name__ == '__main__':
     from _utils.slurm import slurm_parser
     parser = slurm_parser(description = 'Preprocess single-cell datasets for gsMap')
-    parser.add_argument('datasets', nargs = '+', required = True, help = 'Datasets to preprocess, format <dataset>/<prefix>')
+    parser.add_argument('datasets', nargs = '+', help = 'Datasets to preprocess, format <dataset>/<prefix>')
     args = parser.parse_args()
     main(args)
