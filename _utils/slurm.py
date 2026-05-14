@@ -55,7 +55,7 @@ class array_submitter():
                  arraysize = 500, # array size limit, default 2000 for CSD3 cluster, QOS max jobs 500
                  email = True,
                  wallclock = -1, # total time limit per file, default 240 minutes
-                 env = 'wd', # default working environment
+                 env = 'gentoolspy', # default working environment
                  modules = [], # modules to load
                  dependency = [], # dependent jobs
                  account = None,
