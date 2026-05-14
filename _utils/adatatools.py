@@ -14,9 +14,20 @@ from _utils.logger import logger
 log = logger()
 import scanpy as sc
 
+# quality control functions
+
+
+def check_spatial(dataset = None, prefix = None, spatial_key = 'spatial', adata = None):
+    if (close := adata is None): adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+    if not (out := spatial_key in adata.obsm.keys()):
+        log.warn(f'Spatial key {spatial_key} not found, please check your input dataset')
+    if close: adata.file.close()
+    return out
+
+# functions to prompt to command line to select metadata columns/names
 def get_metadata_cols(dataset = None, prefix = None, default = [], input_string = 'cell type', axis = 'obs', adata = None):
     assert axis in ['obs', 'var'], 'axis must be either obs or var'
-    if adata is None: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+    if (close := adata is None): adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
     df = adata.obs if axis == 'obs' else adata.var
     default = [x for x in default if x in df.columns]
     # take keyboard input to select cell type columns
@@ -30,10 +41,11 @@ def get_metadata_cols(dataset = None, prefix = None, default = [], input_string 
     print()
     log.log('Selected ' + input_string + ' columns: ')
     for col in selected_cols: log.log(f'    {col}')
+    if close: adata.file.close()
     return selected_cols
 
 def get_embedding_keys(dataset = None, prefix = None, default = [], adata = None):
-    if adata is None: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+    if (close := adata is None): adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
     default = [x for x in default if x in adata.obsm.keys()]
     log.log('Following embeddings are found:')
     for i, key in enumerate(adata.obsm.keys()):
@@ -45,8 +57,10 @@ def get_embedding_keys(dataset = None, prefix = None, default = [], adata = None
     print()
     log.log('Selected embeddings: ')
     for key in selected_keys: log.log(f'    {key}')
+    if close: adata.file.close()
     return selected_keys
 
+# functions for file operations
 def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     import scanpy as sc
     if type(gene_subset) == str and os.path.isfile(gene_subset): gene_subset = open(gene_subset).read().splitlines()
