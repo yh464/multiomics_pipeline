@@ -217,7 +217,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     # run NMF iterations
     cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
-    if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter)[0]:
+    if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter, update = False)[0]:
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
         return
     
@@ -357,7 +357,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     proj.complete_step('programmes_cnmf', dataset, prefix)
     proj.complete_step('programmes_cnmf_scores', dataset, prefix)
 
-def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = [], seed = 19260817):
+def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_iter = 100, projection = [], seed = 19260817, update = True):
     '''check if cNMF has been completed for given dataset / prefix'''
     proj = project() # need to re-initialise project as this function is called in gene_programmes_batch
     projection = proj.find_h5ad(projection, long = True)
@@ -378,14 +378,15 @@ def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_ite
     # forcibly update cnmf iteration parameters
     import cnmf
     cnmf_obj = cnmf.cNMF(output_dir = os.path.dirname(outdir), name = prefix)
+    prep_complete = os.path.isfile(cnmf_obj.paths['normalized_counts']) and os.path.isfile(cnmf_obj.paths['tpm']) and \
+        os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) and os.access(cnmf_obj.paths['tpm'], os.R_OK)
+    if not update: return len(n_components) * n_iter - n_spectra_complete, not prep_complete
     replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
         ks = n_components, n_iter = n_iter, random_state_seed = seed,
         beta_loss = 'frobenius', init = 'random', alpha_usage = 0.0, alpha_spectra = 0.0, max_iter = 1000
     )
     cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
     cnmf_obj.update_nmf_iter_params()
-    prep_complete = os.path.isfile(cnmf_obj.paths['normalized_counts']) and os.path.isfile(cnmf_obj.paths['tpm']) and \
-        os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) and os.access(cnmf_obj.paths['tpm'], os.R_OK)
     return len(n_components) * n_iter - n_spectra_complete, not prep_complete
 
 def run_spectra(dataset, prefix, outdir, cell_type):
