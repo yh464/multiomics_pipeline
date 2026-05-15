@@ -142,7 +142,8 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     for time_key in time_keys:
-        if not isinstance(adata.obs[time_key].dtype, np.number) and not pd.api.types.is_datetime64_any_dtype(adata.obs[time_key]):
+        try: adata.obs[time_key].astype(float)
+        except:
             log.warn(f'Time key {time_key} is not numeric or datetime, skipping.', calling_file = 'factor_time_reg')
             continue
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
