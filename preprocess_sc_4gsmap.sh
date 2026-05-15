@@ -1,5 +1,5 @@
 #!/bin/bash
-mamba activate /rds/project/rds-Nl99R8pHODQ/toolbox/gsmap
+# mamba activate /rds/project/rds-Nl99R8pHODQ/toolbox/gsmap
 h5ad=$1
 prefix=$2
 workdir=/rds/project/rds-Nl99R8pHODQ/multiomics/gsmap
