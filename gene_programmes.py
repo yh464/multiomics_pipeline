@@ -142,12 +142,12 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     for time_key in time_keys:
+        if not isinstance(adata.obs[time_key].dtype, np.number) and not pd.api.types.is_datetime64_any_dtype(adata.obs[time_key]):
+            log.warn(f'Time key {time_key} is not numeric or datetime, skipping.', calling_file = 'factor_time_reg')
+            continue
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
         scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
         for col in tqdm(score_cols, desc = f'Plotting factor temporal regression for {time_key}'):
-            if not isinstance(score_cols[col].dtype, np.number):
-                log.warn(f'Time key {time_key} is not numeric, skipping regression plot for {col}.', calling_file = 'factor_time_reg')
-                continue
             fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
             fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
             if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
