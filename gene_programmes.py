@@ -117,8 +117,7 @@ def factor_correlation(loadings, out_tabular, out_fig):
 def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force = False):
     log.log(f'Plotting cell-level scores in embedding space: ' + ', '.join(embedding_key), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
-    if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
-        out_fig += '.png'
+    if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'): out_fig += '.pdf'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     for emb_key in embedding_key:
@@ -137,8 +136,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
 def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
     log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_keys), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
-    if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'):
-        out_fig += '.png'
+    if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'): out_fig += '.pdf'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
     score_cols = scores.columns.tolist()
     for time_key in time_keys:
@@ -150,7 +148,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
         scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
         for col in tqdm(score_cols, desc = f'Plotting factor temporal regression for {time_key}'):
             fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
-            fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.png', '_order2.png')
+            fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.pdf', '_order2.pdf').replace('.png', '_order2.png')
             if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
             if not os.path.isfile(fig_1order) or force:
                 fig = temporal_regplot(scores_tmp, x = time_key, y = col, hue = cell_type_key, xlabel = time_xlabel)
@@ -290,14 +288,14 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
         # UMAP plot of cell-level scores
         rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
-        if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.png', 
+        if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.pdf', 
             embedding_key = rep_names, force = force)
         else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf', warning = True)
 
         # pseudotime regression plots
         time_columns = list(set(['age','time','pseudotime'] + time_key))
         if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
-            factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.png', 
+            factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.pdf', 
                 cell_type[0].lower(), time_keys = adata.obs.columns.intersection(time_columns), force = force)
         else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
         
@@ -342,7 +340,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             projected_prefix = prefix.replace('_hvg_','_proj_')
             projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k_optim, dt = density_threshold_str)
             os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
-            if not os.path.isfle(projected_usages_file) or force:
+            if not os.path.isfile(projected_usages_file) or force:
                 adata_normalised = sc.read_h5ad(cnmf_obj.paths['tpm'])
                 projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
                 projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
@@ -434,7 +432,7 @@ def run_spectra(dataset, prefix, outdir, cell_type):
     for factor in cell_scores.columns:
         if 'X_umap' not in adata.obsm.keys(): continue
         fig = scatterplot_adata(adata, v = cell_scores[factor], rep = 'umap')
-        fig.savefig(f'{outdir}/plots/{prefix}_spectra_{factor}_umap.png', bbox_inches = 'tight', dpi = 400)
+        fig.savefig(f'{outdir}/plots/{prefix}_spectra_{factor}_umap.pdf', bbox_inches = 'tight', dpi = 400)
         plt.close(fig)
     adata.var[['spectra_vocab']].to_csv(f'{outdir}/{prefix}_spectra_vocab.txt', sep = '\t', index = True, header = True)
     
@@ -530,7 +528,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     # plot UMAP scatterplot for all factors
     plot_dir = f'{outdir}/plots'; os.makedirs(plot_dir, exist_ok = True)
     rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
-    if len(rep_names) > 0: factor_embedding(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$embedding.png', 
+    if len(rep_names) > 0: factor_embedding(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$embedding.pdf', 
         embedding_key = rep_names, force = force)
     else: log.warn('No embedding found in adata.obsm, skipping scIRED factor embedding plots.', calling_file = 'run_scired', warning = True)
 
@@ -538,7 +536,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     adata.obs.columns = adata.obs.columns.str.lower()
     time_columns = list(set(['age','time','pseudotime'] + time_key))
     if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
-        factor_time_reg(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$timekey.png', cell_type[0], force = force)
+        factor_time_reg(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$timekey.pdf', cell_type[0], force = force)
     else: log.log('No time-related columns found in adata.obs, skipping scIRED factor pseudotime regression plots.', calling_file = 'run_scired')
 
     # FCAT analysis for factor importance
