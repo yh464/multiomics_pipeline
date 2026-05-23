@@ -119,6 +119,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
     if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'): out_fig += '.pdf'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
+    vmax = max(np.nanquantile(np.abs(scores.values), 0.95)*1.5,np.nanmax(np.abs(scores.values)))
     score_cols = scores.columns.tolist()
     for emb_key in embedding_key:
         if not emb_key in adata.obsm.keys():
@@ -128,7 +129,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
         for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
             if os.path.isfile(figname) and not force: continue
-            fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
+            fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
             fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')

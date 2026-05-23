@@ -53,9 +53,10 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 0.1, rep = '
     if np.nanmax(v) <= 0: vmin = max(np.nanquantile(v, 0.05)*1.5,np.nanmin(v)) if vmin == None else vmin; vmax = 0 if vmax == None else vmax
     elif np.nanmin(v) >= 0: vmin = 0 if vmin == None else vmin; vmax = min(np.nanquantile(v,0.95),np.nanmax(v)) if vmax == None else vmax
     else:
-      absv = np.abs(v) 
+      absv = np.abs(v)
       vmin = -max(np.nanquantile(absv, 0.95)*1.5,np.nanmax(absv)) if vmin == None else vmin
       vmax = max(np.nanquantile(absv, 0.95)*1.5,np.nanmax(absv)) if vmax == None else vmax
+      vmax, vmin = max(abs(vmin), abs(vmax)), -max(abs(vmin), abs(vmax)) # ensure vmin and vmax are symmetric around 0
     kwargs['hue_norm'] = mpl.colors.Normalize(vmin = vmin, vmax = vmax)
 
   # main plot
