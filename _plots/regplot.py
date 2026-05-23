@@ -193,7 +193,7 @@ def temporal_regplot(
                     xmax = cat_clipped[x].max(), xmin = cat_clipped[x].min())
                 if annotate_corr and len(y) == 1: # only one correlation value can be annotated
                     cat_full = df.loc[df[hue] == cat, :]
-                    r = cat_full[x].corr(cat_full[col])
+                    r = cat_full[x].corr(cat_full[y[0]])
                     annot_axis.text((cat_clipped[x].min() + cat_clipped[x].max()) / 2, current_height - 0.05,
                         f'{cat}: r={r:.3f}', fontsize = 12, ha = 'center', va = 'top', color = palette[cat])
                 else: annot_axis.text((cat_clipped[x].min() + cat_clipped[x].max()) / 2, current_height - 0.05,
