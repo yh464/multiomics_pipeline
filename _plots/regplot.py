@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.stats import median_abs_deviation as mad
-from .aes import discrete_palette, redblue
+from .aes import discrete_palette_n, redblue
 
 def _disjoint_groups(df):
     '''
@@ -43,7 +43,7 @@ def _disjoint_groups(df):
 def _generate_colour_palette(groups):
     '''groups should be a list of lists, generated from _disjoint_groups'''
     n_groups = len(groups)
-    palette = discrete_palette(n_groups)
+    palette = discrete_palette_n(n_groups)
     return {cat: palette[i] for i in range(n_groups) for cat in groups[i]}
 
 def _add_regression_axis(
