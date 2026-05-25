@@ -155,7 +155,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
             fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.pdf', '_order2.pdf').replace('.png', '_order2.png')
             if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
             if not os.path.isfile(fig_1order) or force:
-                fig = temporal_regplot(scores_tmp, time_key, col, hue = cell_type_key, xlabel = time_xlabel)
+                fig = temporal_regplot(scores_tmp, time_key, col, hue = cell_type_key, xlabel = time_xlabel, annotate_corr = False)
                 fig.savefig(fig_1order, bbox_inches = 'tight', dpi = 400)
                 plt.close(fig)
             if not os.path.isfile(fig_2order) or force:

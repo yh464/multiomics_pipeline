@@ -86,10 +86,10 @@ greyblue_alpha = mpl.colors.LinearSegmentedColormap(
 
 def discrete_palette_n(n):
   '''Default colour palette to use for discrete mapping'''
-  if n <= 10: return sns.color_palette('muted', n)
+  if n <= 10: return sns.color_palette('Set2', n)
   else:
     palette = sns.color_palette('husl', n) # reorder to maximise distance between adjacent colours
-    split_half = np.ceil(n / 2)
+    split_half = int(np.ceil(n / 2))
     out = []
     for i in range(split_half):
       out.append(palette[i])

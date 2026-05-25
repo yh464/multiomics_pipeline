@@ -26,6 +26,7 @@ def get_fdr(df, group_by = [0,1], sig_col = None, p_threshold: list[float] = [])
     if 'fdr' in df.columns: df['q'] = df['fdr']
     if 'FDR' in df.columns: df['q'] = df['fdr']
     if 'P' in df.columns: df['p'] = df['P']
+    group_by = [df.columns[i] if type(i) == int else i for i in group_by]
     
     if sig_col is not None and sig_col in df.columns:
         sig_col_copy = df[sig_col].copy()
@@ -40,7 +41,7 @@ def get_fdr(df, group_by = [0,1], sig_col = None, p_threshold: list[float] = [])
                 df.loc[~np.isnan(df['p']),'q'] = fdr(df.loc[~np.isnan(df['p']),'p'])
             else:
                 for _, df_group in df.groupby(group_by):
-                    df.loc[df.index.isin(df_group.index) & ~np.isnan(df_group['p']),'q'] = \
+                    df.loc[df.index.isin(df_group.index) & ~np.isnan(df['p']),'q'] = \
                         fdr(df_group.loc[~np.isnan(df_group['p']),'p'])
         df = df.assign(Significance = 'not significant')
         df.loc[df['p'] < 0.05, 'Significance'] = 'nominal'
