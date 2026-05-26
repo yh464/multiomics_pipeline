@@ -10,7 +10,7 @@ from operator import call
 import gget, io, time, warnings
 import pandas as pd
 import numpy as np
-from ..gadgets import force_gc
+from .gadgets import force_gc
 from ..logger import logger
 log = logger()
 
