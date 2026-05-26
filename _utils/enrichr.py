@@ -11,7 +11,7 @@ import gget, io, time, warnings
 import pandas as pd
 import numpy as np
 from .gadgets import force_gc
-from ..logger import logger
+from .logger import logger
 log = logger()
 
 def get_genes_list(df, gene_col = None, top = -1, by = None, cutoff = None, top_negative = True, 
