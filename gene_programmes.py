@@ -357,7 +357,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             else:
                 projected_usages = pd.read_table(projected_usages_file, index_col = 0)
                 projection_loadings = pd.read_table(projection_loadings, index_col = 0)
-                projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
+                projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata.var_names)]
             cnmf_downstream(projected_usages, projection_loadings, adata, cell_type, outdir, projected_prefix, projection_loadings.shape[0], force, savedir = None)
         
         return # do not register on the progress file if it is a projection
