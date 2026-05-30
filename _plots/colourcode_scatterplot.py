@@ -40,7 +40,7 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 0.1, rep = '
   # colour palette
   if palette != None:
     register_palettes(palette)
-    use_palette = palette.name
+    use_palette = palette
   else:
     if v.dtype.name == 'category' or v.dtype == object:
       use_palette = discrete_palette(v.unique())
