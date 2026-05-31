@@ -91,14 +91,15 @@ class logger():
     def profile(self, func):
         def wrapper(*args, **kwargs):
             tracemalloc.start()
-            result =  func(*args, **kwargs)
-            wall_time = time.perf_counter() - self.start_time
-            cpu_time = time.process_time() - self.cpu_time
-            self.log('Analysis finished')
-            self.log(f'    Peak memory usage: {tracemalloc.get_traced_memory()[1] / 1024 ** 2:.2f} MB')
-            self.log(f'    Total time: {wall_time:.2f} seconds')
-            self.log(f'    CPU time: {cpu_time:.2f} seconds')
-            self.log(f'    CPU usage: {(cpu_time / wall_time * 100) if wall_time > 0 else 0:.2f}%')
-            tracemalloc.stop()
+            try: result =  func(*args, **kwargs)
+            finally:
+                wall_time = time.perf_counter() - self.start_time
+                cpu_time = time.process_time() - self.cpu_time
+                self.log('Analysis finished')
+                self.log(f'    Peak memory usage: {tracemalloc.get_traced_memory()[1] / 1024 ** 2:.2f} MB')
+                self.log(f'    Total time: {wall_time:.2f} seconds')
+                self.log(f'    CPU time: {cpu_time:.2f} seconds')
+                self.log(f'    CPU usage: {(cpu_time / wall_time * 100) if wall_time > 0 else 0:.2f}%')
+                tracemalloc.stop()
             return result
         return wrapper
