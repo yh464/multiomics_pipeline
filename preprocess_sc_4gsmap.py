@@ -11,7 +11,7 @@ def main(args):
     h5ad_raw = proj.find_h5ad(args.datasets, normalised = False)
 
     submitter = array_submitter(n_cpu = 40, timeout = 720, name = 'preprocess_sc_4gsmap',
-        wd = '/rds/project/rds-Nl99R8pHODQ/toolbox/gsmap')
+        env = '/rds/project/rds-Nl99R8pHODQ/toolbox/gsmap')
 
     for dataset, prefix in h5ad_raw:
         if not check_spatial(dataset, prefix): continue
