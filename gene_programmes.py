@@ -24,6 +24,7 @@ from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
 from _plots.regplot import temporal_regplot
 
+# region: factor downstream analyses
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
     from _utils.enrichr import enrichr_continuous
     out = []
@@ -163,10 +164,96 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
                 fig.savefig(fig_2order, bbox_inches = 'tight', dpi = 400)
                 plt.close(fig)
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
+# endregion
+
+# region: cnmf pipeline
+def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir = None):
+    loadings = loadings.T
+    cell_type = [x.lower() for x in cell_type if x in adata.obs.columns]
+    adata.obs.columns = adata.obs.columns.str.lower()
+
+    plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
+    os.makedirs(plot_dir, exist_ok = True)
+    out_celltype = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_celltype_stats.txt'
+    out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat_$celltype.txt'
+    out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat_$celltype.pdf'
+    out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
+    out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
+    out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
+
+    # UMAP plot of cell-level scores
+    rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
+    if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.pdf', 
+        embedding_key = rep_names, force = force)
+    else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf', warning = True)
+
+    # pseudotime regression plots
+    time_columns = list(set(['age','time','pseudotime'] + time_key))
+    if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
+        factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.pdf', 
+            cell_type[0].lower(), time_keys = adata.obs.columns.intersection(time_columns), force = force)
+    else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
+    
+    # cell type descriptive stats
+    if len(cell_type) > 0: factor_celltype_stats(usages, adata, cell_type, out_celltype)
+    log.log(f'cNMF cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_cnmf')
+
+    # factor importance scoring
+    if (not os.path.isfile(out_fcat) or force) and len(cell_type) > 0 and cell_type[0] in adata.obs.columns:
+        log.log('Conducting cNMF factor importance analysis', calling_file = 'run_cnmf')
+        factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
+    log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
+
+    # correlation and enrichment analysis
+    factor_correlation(loadings, out_corr, out_corr_fig)
+    log.log(f'cNMF factor correlation plot saved to {out_corr_fig}', calling_file = 'run_cnmf')
+    if not os.path.isfile(out_enrichr) or force:
+        enrichr_res = factor_enrichr(loadings, top_negative = False)
+        enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
+    log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
+
+    if savedir is not None:
+        os.makedirs(savedir, exist_ok = True)
+        loadings.index.name = 'gene'
+        loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
+        loadings.to_csv(f'{savedir}/{prefix}.cnmf_k{k_optim}.txt', sep = '\t', index = True, header = True)
+        log.log(f'Formatted cNMF loadings for MAGMA GSEA analysis saved to {savedir}/{prefix}.cnmf_k{k_optim}.txt', calling_file = 'run_cnmf')
+
+def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw, 
+        projection_dataset, projection_prefix, k, dt, 
+        cell_type, outdir, embedding, time_key, seed = 19260817, force = False):
+    projection_loadings = proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix, k = k, dt = dt)
+    if not os.path.isfile(projection_loadings):
+        log.warn(f'Projection loadings from {projection_dataset}/{projection_prefix} not found, skipping projection step.', calling_file = 'cnmf_project')
+        return
+    import scanpy as sc
+    from sklearn.decomposition import NMF
+    log.log(f'Projecting input data onto loadings from {projection_dataset}/{projection_prefix}', calling_file = 'cnmf_project')
+    projected_prefix = prefix.replace('_hvg_','_proj_')
+    projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k, dt = dt)
+    os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
+    if not os.path.isfile(projected_usages_file) or force:
+        adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
+        projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
+        projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
+        nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
+        nmf.components_ = projection_loadings.values.astype(adata_normalised.X.dtype)
+        projected_usages = nmf.transform(adata_normalised.X)
+        projected_usages = pd.DataFrame(projected_usages, index = adata_normalised.obs_names, 
+            columns = [i+1 for i in range(projected_usages.shape[1])])
+        projected_usages.to_csv(projected_usages_file, sep = '\t', index = True, header = True)
+    else:
+        projected_usages = pd.read_table(projected_usages_file, index_col = 0)
+        projection_loadings = pd.read_table(projection_loadings, index_col = 0)
+        projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata.var_names)]
+    adata = sc.read_h5ad(h5ad_raw, 'r')
+    with open(f'{outdir}/{projected_prefix}/{projected_prefix}_cnmf_k{projection_loadings.shape[0]}_enrichr.txt', 'w') as f: print('', file = f)
+    cnmf_downstream(projected_usages, projection_loadings, adata, cell_type, outdir, projected_prefix, projection_loadings.shape[0], 
+        embedding, time_key, force, savedir = None)
 
 def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, 
     cell_type = [], embedding = ['X_umap'], time_key = ['pseudotime'],
-    seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None, projection = []):
+    seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None, projection = [], project_only = False):
     '''
     run consensus NMF on input h5ad file (RAW COUNTS)
     outdir: output directory
@@ -191,6 +278,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         log.log(f'Re-fitting cNMF using highly variable genes from {projection_dataset}/{projection_prefix}', calling_file = 'run_cnmf')
         prefix_old = prefix; h5ad_old = h5ad_raw
         prefix = new_prefix; h5ad_raw = projected_h5ad
+
     outdir = os.path.realpath(outdir).replace('$dataset', dataset).replace('$prefix', prefix)
 
     import cnmf
@@ -210,6 +298,12 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             log.log('Pre-processing step is not complete, please re-run the programme setting worker_id to -1')
             return
     
+    if project_only:
+        log.warn(f'This script will only project {dataset}{prefix_old} onto {projection_dataset}/{projection_prefix}, no refit')
+        cnmf_project(dataset, prefix_old, cnmf_obj, h5ad_old, projection_dataset, projection_prefix, k = n_components[0], dt = density_threshold, 
+            cell_type = cell_type, outdir = outdir, embedding = embedding, time_key = time_key, seed = seed, force = force)
+        return
+
     if worker_id == 0: 
         log.log('Setting cNMF runtime parameters', calling_file = 'run_cnmf')
         replicate_params, run_params = cnmf_obj.get_nmf_iter_params(
@@ -275,93 +369,16 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     density_threshold_str = str(density_threshold).replace('.','_')
     if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str)) or force:
         cnmf_obj.consensus(k = k_optim, density_threshold = density_threshold)
-
-    def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, force, savedir = None):
-        loadings = loadings.T
-        cell_type = [x.lower() for x in cell_type if x in adata.obs.columns]
-        adata.obs.columns = adata.obs.columns.str.lower()
-
-        plot_dir = f'{outdir}/{prefix}/k_{k_optim}_plots'
-        os.makedirs(plot_dir, exist_ok = True)
-        out_celltype = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_celltype_stats.txt'
-        out_fcat = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat_$celltype.txt'
-        out_fcat_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_fcat_$celltype.pdf'
-        out_corr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.txt'
-        out_corr_fig = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_correlation.pdf'
-        out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
-
-        # UMAP plot of cell-level scores
-        rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
-        if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.pdf', 
-            embedding_key = rep_names, force = force)
-        else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf', warning = True)
-
-        # pseudotime regression plots
-        time_columns = list(set(['age','time','pseudotime'] + time_key))
-        if len(cell_type) > 0 and adata.obs.columns.intersection(time_columns).size > 0:
-            factor_time_reg(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$timekey.pdf', 
-                cell_type[0].lower(), time_keys = adata.obs.columns.intersection(time_columns), force = force)
-        else: log.log('No time-related columns found in adata.obs, skipping cNMF factor pseudotime regression plots.', calling_file = 'run_cnmf')
-        
-        # cell type descriptive stats
-        if len(cell_type) > 0: factor_celltype_stats(usages, adata, cell_type, out_celltype)
-        log.log(f'cNMF cell type descriptive statistics saved to {out_celltype}', calling_file = 'run_cnmf')
-
-        # factor importance scoring
-        if (not os.path.isfile(out_fcat) or force) and len(cell_type) > 0 and cell_type[0] in adata.obs.columns:
-            log.log('Conducting cNMF factor importance analysis', calling_file = 'run_cnmf')
-            factor_importance(usages.values, adata, cell_type, out_fcat, out_fcat_fig)
-        log.log(f'cNMF factor importance analysis saved to {out_fcat} and {out_fcat_fig}', calling_file = 'run_cnmf')
-
-        # correlation and enrichment analysis
-        factor_correlation(loadings, out_corr, out_corr_fig)
-        log.log(f'cNMF factor correlation plot saved to {out_corr_fig}', calling_file = 'run_cnmf')
-        if not os.path.isfile(out_enrichr) or force:
-            enrichr_res = factor_enrichr(loadings, top_negative = False)
-            enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
-        log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
-
-        if savedir is not None:
-            os.makedirs(savedir, exist_ok = True)
-            loadings.index.name = 'gene'
-            loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
-            loadings.to_csv(f'{savedir}/{prefix}.cnmf_k{k_optim}.txt', sep = '\t', index = True, header = True)
-            log.log(f'Formatted cNMF loadings for MAGMA GSEA analysis saved to {savedir}/{prefix}.cnmf_k{k_optim}.txt', calling_file = 'run_cnmf')
     
     usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
-    cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, force, savedir)
+    cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir)
 
     # enforce projection using available loadings from projection_dataset/projection_prefix
     if len(projection) > 0:
-        projection_loadings = proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix, k = k_optim, dt = density_threshold_str)
-        if not os.path.isfile(projection_loadings):
-            log.warn(f'Projection loadings from {projection_dataset}/{projection_prefix} not found, skipping projection step.', calling_file = 'run_cnmf')
-        else:
-            from sklearn.decomposition import NMF
-            log.log(f'Projecting input data onto loadings from {projection_dataset}/{projection_prefix}', calling_file = 'run_cnmf')
-            projected_prefix = prefix.replace('_hvg_','_proj_')
-            projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k_optim, dt = density_threshold_str)
-            os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
-            if not os.path.isfile(projected_usages_file) or force:
-                adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
-                projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
-                projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
-                nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
-                nmf.components_ = projection_loadings.values.astype(adata_normalised.X.dtype)
-                projected_usages = nmf.transform(adata_normalised.X)
-                projected_usages = pd.DataFrame(projected_usages, index = adata_normalised.obs_names, 
-                    columns = [i+1 for i in range(projected_usages.shape[1])])
-                projected_usages.to_csv(projected_usages_file, sep = '\t', index = True, header = True)
-            else:
-                projected_usages = pd.read_table(projected_usages_file, index_col = 0)
-                projection_loadings = pd.read_table(projection_loadings, index_col = 0)
-                projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata.var_names)]
-            adata = sc.read_h5ad(h5ad_old, 'r')
-            with open(f'{outdir}/{projected_prefix}/{projected_prefix}_cnmf_k{projection_loadings.shape[0]}_enrichr.txt', 'w') as f: print('', file = f)
-            cnmf_downstream(projected_usages, projection_loadings, adata, cell_type, outdir, projected_prefix, projection_loadings.shape[0], force, savedir = None)
-        
+        cnmf_project(dataset, prefix_old, cnmf_obj, h5ad_old, projection_dataset, projection_prefix, k = k_optim, dt = density_threshold,
+            cell_type = cell_type, outdir = outdir, embedding = embedding, time_key = time_key, seed = seed, force = force)
         return # do not register on the progress file if it is a projection
 
     proj.complete_step('programmes_cnmf', dataset, prefix)
@@ -398,7 +415,9 @@ def check_cnmf_incomplete(dataset, prefix, n_components = range(5, 41, 1), n_ite
     cnmf_obj.save_nmf_iter_params(replicate_params, run_params)
     cnmf_obj.update_nmf_iter_params()
     return len(n_components) * n_iter - n_spectra_complete, not prep_complete
+# endregion
 
+# region: spectra pipeline (incomplete)
 def run_spectra(dataset, prefix, outdir, cell_type):
     '''
     run Spectra on input h5ad file (RAW COUNTS)
@@ -446,7 +465,9 @@ def run_spectra(dataset, prefix, outdir, cell_type):
     
     proj.complete_step('programmes_spectra', dataset, prefix)
     proj.complete_step('programmes_spectra_scores', dataset, prefix)
+# endregion
 
+# region: scIRED pipeline
 def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000, 
     covar_cols = [], cell_type = [], embedding = ['X_umap'], time_key = ['pseudotime'],         
     seed = 19260817, force = False, savedir = None):
@@ -608,6 +629,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
         loading_varimax_.index.name = 'gene'
         loading_varimax_.columns = [f'{prefix}.scired.F{i+1}' for i in range(loading_varimax_.shape[1])]
         loading_varimax_.to_csv(f'{savedir}/{prefix}.scired.txt', sep = '\t', index = True, header = True)
+# endregion
 
 @log.profile
 def main(args):
@@ -621,7 +643,7 @@ def main(args):
     if args.cnmf:
         run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817,
-            force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None, projection = projection)
+            force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None, projection = projection, project_only = args.project_only)
     if args.scired:
         run_scired(args.dataset, args.prefix, scired_outdir, n_components = args.scired_components,
             n_genes = args.scired_genes, covar_cols = args.scired_covars, cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, 
@@ -646,6 +668,7 @@ def add_cmd_args(parser):
 
     parser.add_argument('--project', type = str, nargs = '*', default = [], dest = 'projection',
         help = 'Use pre-computed gene programmes of another dataset and project onto the current dataset. Format <dataset>/<prefix>')
+    parser.add_argument('--project_only', action = 'store_true', help = 'Only perform projection, no refit')
     
     parser.add_argument('--cell_type', type = str, nargs = '+', default = ['cell_type'],
         help = '''Categorical factors in adata.obs that denote the cell type. 

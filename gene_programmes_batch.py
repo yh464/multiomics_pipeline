@@ -51,7 +51,8 @@ def main(args):
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} --scired_covars {" ".join(args.scired_covars)} '+ \
             f'--cell_type {" ".join(selected_cell_types)} --time_key {" ".join(selected_time_keys)} --embedding {" ".join(args.embedding)}'
         if len(args.projection) > 0: cmd += ' --project ' + ' '.join(args.projection)
-        if args.force: cmd += ' --force'
+        for key in ['force', 'spectra', 'magma', 'project_only']:
+            if getattr(args, key): cmd += f' --{key}'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
             n_cnmf_incomplete, norm_counts_incomplete = check_cnmf_incomplete(dataset, prefix, 
@@ -61,8 +62,6 @@ def main(args):
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
             if norm_counts_incomplete: cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
-        if args.scired: scired_submitter.add(cmd + ' --scired')
-        if args.spectra: spectra_submitter.add(cmd + ' --spectra')
     cnmf_submitter.submit()
     scired_submitter.submit()
     spectra_submitter.submit()
