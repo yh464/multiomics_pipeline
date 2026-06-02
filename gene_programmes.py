@@ -236,6 +236,7 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
     projected_prefix = prefix.replace('_hvg_','_proj_')
     projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k, dt = dt)
     os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
+    adata = sc.read_h5ad(h5ad_raw, 'r')
     if not os.path.isfile(projected_usages_file) or force:
         adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
         projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
@@ -250,7 +251,6 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
         projected_usages = pd.read_table(projected_usages_file, index_col = 0)
         projection_loadings = pd.read_table(projection_loadings, index_col = 0)
         projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata.var_names)]
-    adata = sc.read_h5ad(h5ad_raw, 'r')
     with open(f'{outdir}/{projected_prefix}/{projected_prefix}_cnmf_k{projection_loadings.shape[0]}_enrichr.txt', 'w') as f: print('', file = f)
     cnmf_downstream(projected_usages, projection_loadings, adata, cell_type, outdir, projected_prefix, projection_loadings.shape[0], 
         embedding, time_key, force, savedir = None)
