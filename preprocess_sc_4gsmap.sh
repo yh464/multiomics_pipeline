@@ -8,7 +8,7 @@ mkdir -p "$workdir/$prefix/latent_to_gene"
 mkdir -p "$workdir/$prefix/generate_ldscore"
 if [ ! -f "$workdir/$prefix/find_latent_representations/${prefix}_add_latent.h5ad" ]; then
   gsmap run_find_latent_representations --workdir /rds/project/rds-Nl99R8pHODQ/multiomics/gsmap --sample_name "$prefix" \
-    --input_hdf5_path "$h5ad" --annotation annotation --data_layer count
+    --input_hdf5_path "$h5ad" --annotation annotation --data_layer X
 fi
 if [ ! -f "$workdir/$prefix/latent_to_gene/${prefix}_gene_marker_score.feather" ]; then
   gsmap run_latent_to_gene --workdir /rds/project/rds-Nl99R8pHODQ/multiomics/gsmap --sample_name "$prefix" \
