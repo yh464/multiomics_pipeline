@@ -233,6 +233,7 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
     from sklearn.decomposition import NMF
     log.log(f'Projecting input data onto loadings from {projection_dataset}/{projection_prefix}', calling_file = 'cnmf_project')
     projected_prefix = prefix.replace('_hvg_','_proj_')
+    if isinstance(dt, float): dt = str(dt).replace('.','_')
     projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k, dt = dt)
     os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
     if not os.path.isfile(projected_usages_file) or force:
