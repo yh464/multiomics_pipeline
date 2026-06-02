@@ -67,7 +67,7 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 'auto', rep 
     y_sorted = df.sort_values('y')['y'].values
     x_diff = x_sorted[1:] - x_sorted[:-1]
     y_diff = y_sorted[1:] - y_sorted[:-1]
-    s = min(np.nanquantile(x_diff, 0.01), np.nanquantile(y_diff, 0.01)) **2 * 2
+    s = min(np.nanquantile(x_diff, 0.05), np.nanquantile(y_diff, 0.05)) **2 * 2
     s = min(max(s, 0.01), 64) # set a reasonable range for point size
   sns.scatterplot(data = df, x = 'x', y = 'y', hue = 'v', palette = use_palette, s = s, ax = ax, edgecolor = None, linewidth = 0, 
       legend = legend, rasterized = True, **kwargs)
