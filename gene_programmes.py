@@ -303,8 +303,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             return
     
     if project_only:
-        log.warn(f'This script will only project {dataset}{prefix_old} onto {projection_dataset}/{projection_prefix}, no refit')
-        cnmf_project(dataset, prefix_old, cnmf_obj, h5ad_old, projection_dataset, projection_prefix, k = n_components[0], dt = density_threshold, 
+        log.warn(f'This script will only project {dataset}/{prefix_old} onto {projection_dataset}/{projection_prefix}, no refit')
+        cnmf_project(dataset, prefix, cnmf_obj, h5ad_old, projection_dataset, projection_prefix, k = n_components[0], dt = density_threshold, 
             cell_type = cell_type, outdir = outdir, embedding = embedding, time_key = time_key, seed = seed, force = force)
         return
 
@@ -381,7 +381,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     # enforce projection using available loadings from projection_dataset/projection_prefix
     if len(projection) > 0:
-        cnmf_project(dataset, prefix_old, cnmf_obj, h5ad_old, projection_dataset, projection_prefix, k = k_optim, dt = density_threshold,
+        cnmf_project(dataset, prefix, cnmf_obj, h5ad_old, projection_dataset, projection_prefix, k = k_optim, dt = density_threshold,
             cell_type = cell_type, outdir = outdir, embedding = embedding, time_key = time_key, seed = seed, force = force)
         return # do not register on the progress file if it is a projection
 
