@@ -225,6 +225,7 @@ def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim,
 def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw, 
         projection_dataset, projection_prefix, k, dt, 
         cell_type, outdir, embedding, time_key, seed = 19260817, force = False):
+    if isinstance(dt, float): dt = str(dt).replace('.','_')
     projection_loadings = proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix, k = k, dt = dt)
     if not os.path.isfile(projection_loadings):
         log.warn(f'Projection loadings from {projection_dataset}/{projection_prefix} not found, skipping projection step.', calling_file = 'cnmf_project')
@@ -233,7 +234,6 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
     from sklearn.decomposition import NMF
     log.log(f'Projecting input data onto loadings from {projection_dataset}/{projection_prefix}', calling_file = 'cnmf_project')
     projected_prefix = prefix.replace('_hvg_','_proj_')
-    if isinstance(dt, float): dt = str(dt).replace('.','_')
     projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k, dt = dt)
     os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
     if not os.path.isfile(projected_usages_file) or force:
