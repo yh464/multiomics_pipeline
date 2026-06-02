@@ -63,11 +63,14 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 'auto', rep 
   fig = plt.figure(figsize = (5.3,5))
   ax = fig.add_axes((0.3/5.3, 0.3/5, 4.4/5.3, 4.4/5))
   if s == 'auto':
-    x_sorted = df.sort_values('x')['x'].values
-    y_sorted = df.sort_values('y')['y'].values
-    x_diff = x_sorted[1:] - x_sorted[:-1]
-    y_diff = y_sorted[1:] - y_sorted[:-1]
-    s = min(np.nanquantile(x_diff, 0.05), np.nanquantile(y_diff, 0.05)) **2 * 2
+    # estimate minimum distance between points in the x-y plane
+    from scipy.spatial.distance import pdist
+    if df.shape[0] > 1:
+      dists = pdist(df[['x','y']].values)
+      min_dist = np.nanquantile(dists, 0.01) # use 1st percentile of distances to avoid outliers dominating
+      s = (min_dist/2)**2 * np.pi # set point size so that points with minimum distance just start to touch each other
+    else:
+      s = 10
     s = min(max(s, 0.01), 64) # set a reasonable range for point size
   sns.scatterplot(data = df, x = 'x', y = 'y', hue = 'v', palette = use_palette, s = s, ax = ax, edgecolor = None, linewidth = 0, 
       legend = legend, rasterized = True, **kwargs)
