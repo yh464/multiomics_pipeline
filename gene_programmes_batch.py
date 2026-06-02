@@ -59,6 +59,7 @@ def main(args):
                 range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2]) if len(args.cnmf_components) == 3 else args.cnmf_components,
                 projection = args.projection)
             n_jobs = max(1, min(100, n_cnmf_incomplete)) # use up to 100 workers
+            if args.project_only and len(args.projection) > 0: n_jobs = 1
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
             if norm_counts_incomplete: cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
