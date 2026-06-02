@@ -83,6 +83,9 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     return fcat_mat
 
 def factor_celltype_stats(scores, adata, cell_type_key, out_tabular):
+    if len(cell_type_key) == 0:
+        log.warn('No cell type key provided, skipping cell type descriptive statistics.')
+        return
     cell_type_mean = []; cell_type_sd = []
     for ct in cell_type_key:
         cell_type_mean.append(scores.groupby(adata.obs[ct], observed=True).mean().assign(annot = ct).reset_index(names = 'cell_type'))
@@ -670,7 +673,7 @@ def add_cmd_args(parser):
         help = 'Use pre-computed gene programmes of another dataset and project onto the current dataset. Format <dataset>/<prefix>')
     parser.add_argument('--project_only', action = 'store_true', help = 'Only perform projection, no refit')
     
-    parser.add_argument('--cell_type', type = str, nargs = '+', default = ['cell_type'],
+    parser.add_argument('--cell_type', type = str, nargs = '*', default = ['cell_type'],
         help = '''Categorical factors in adata.obs that denote the cell type. 
         Only the first is used for Spectra decomposition and pseudotime regression plots.
         All factors are used for factor importance scoring
