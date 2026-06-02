@@ -68,7 +68,7 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 'auto', rep 
     if df.shape[0] > 1:
       dists = pdist(df[['x','y']].values)
       min_dist = np.nanquantile(dists, 0.01) # use 1st percentile of distances to avoid outliers dominating
-      s = (min_dist/2)**2 * np.pi # set point size so that points with minimum distance just start to touch each other
+      s = (min_dist/2)**2 # set point size so that points with minimum distance just start to touch each other
     else:
       s = 10
     s = min(max(s, 0.01), 64) # set a reasonable range for point size
