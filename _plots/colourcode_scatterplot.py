@@ -45,8 +45,8 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 'auto', rep 
     if v.dtype.name == 'category' or v.dtype == object:
       use_palette = discrete_palette(v.unique())
     else:
-      if np.nanmax(v) <= 0: from .aes import greyblue_alpha; use_palette = greyblue_alpha.name; register_palettes(greyblue_alpha)
-      elif np.nanmin(v) >= 0: from .aes import redgrey_alpha; use_palette = redgrey_alpha.name; register_palettes(redgrey_alpha)
+      if np.nanmax(v) <= 0: from .aes import greyblue_alpha0; use_palette = greyblue_alpha0.name; register_palettes(greyblue_alpha0)
+      elif np.nanmin(v) >= 0: from .aes import redgrey_alpha0; use_palette = redgrey_alpha0.name; register_palettes(redgrey_alpha0)
       else: from .aes import redblue_alpha; register_palettes(redblue_alpha); use_palette = redblue_alpha.name
   legend = 'auto' if (v.dtype.name == 'category' or v.dtype == object) else False
   if not (v.dtype.name == 'category' or v.dtype == object):
@@ -63,15 +63,17 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 'auto', rep 
   fig = plt.figure(figsize = (5.3,5))
   ax = fig.add_axes((0.3/5.3, 0.3/5, 4.4/5.3, 4.4/5))
   if s == 'auto':
-    # estimate minimum distance between points in the x-y plane
-    from scipy.spatial.distance import pdist
-    if df.shape[0] > 1:
-      dists = pdist(df[['x','y']].values)
-      min_dist = np.nanquantile(dists, 0.01) # use 1st percentile of distances to avoid outliers dominating
-      s = (min_dist/2)**2 / np.pi
-    else:
-      s = 10
-    s = min(max(s, 0.01), 64) # set a reasonable range for point size
+    # # estimate distance between points in the x-y plane
+    # from scipy.spatial.distance import pdist
+    # if df.shape[0] > 1 and df.shape[0] < 50000:
+    #   dists = pdist(df[['x','y']].values)
+    #   min_dist = np.nanquantile(dists, 0.05)
+    #   axis_range = max(df['x'].max() - df['x'].min(), df['y'].max() - df['y'].min())
+    #   s = (min_dist/axis_range)**2 * 144
+    # elif df.shape[0] >= 50000: s = 0.1
+    # else: s = 10
+    s = 64000 / df.shape[0]
+    s = min(max(s, 0.1), 36) # set a reasonable range for point size
   sns.scatterplot(data = df, x = 'x', y = 'y', hue = 'v', palette = use_palette, s = s, ax = ax, edgecolor = None, linewidth = 0, 
       legend = legend, rasterized = True, **kwargs)
   ax.axis('off')

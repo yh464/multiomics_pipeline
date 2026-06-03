@@ -10,7 +10,7 @@ def main(args):
     out_dir = '/rds/project/rds-Nl99R8pHODQ/multiomics/gsmap'
     h5ad_raw = proj.find_h5ad(args.datasets, normalised = False)
 
-    submitter = array_submitter(n_cpu = 40, timeout = 720, name = 'preprocess_sc_4gsmap',
+    submitter = array_submitter(n_cpu = 16, timeout = 720, name = 'preprocess_sc_4gsmap',
         env = '/rds/project/rds-Nl99R8pHODQ/toolbox/gsmap')
 
     for dataset, prefix in h5ad_raw:
