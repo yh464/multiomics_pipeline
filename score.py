@@ -105,21 +105,21 @@ def run_cepo(args):
     log.log(f'Read in data: {adata.shape} in {t()-tic:.2f}s')
 
     out_dfs = []
-    for label in args.label:
-        tempdir = f'/home/yh464/rds/hpc-work/temp/cepo/{os.path.basename(args._in)[:-5]}/{label}'
-        tempfile = f'{tempdir}/cepo.{label}.txt'
+    for ct in args.cell_type:
+        tempdir = f'/home/yh464/rds/hpc-work/temp/cepo/{os.path.basename(args._in)[:-5]}/{ct}'
+        tempfile = f'{tempdir}/cepo.{ct}.txt'
         if os.path.isfile(tempfile) and not args.force:
             df = pd.read_table(tempfile, index_col = 0)
             out_dfs.append(df)
-            log.log(label); continue
-        if label not in adata.obs.columns: Warning(f'Label {label} not found in adata.obs, skipping'); continue
-        df = singlebatchcepo(adata, genes, adata.obs[label], mincells = 20, exprspct = 0.05, tempdir = tempdir)
+            log.log(ct); continue
+        if ct not in adata.obs.columns: Warning(f'Cell type {ct} not found in adata.obs, skipping'); continue
+        df = singlebatchcepo(adata, genes, adata.obs[ct], mincells = 20, exprspct = 0.05, tempdir = tempdir)
         gc.collect()
-        df.columns = [f'cepo.{label}.{x}' for x in df.columns]
+        df.columns = [f'cepo.{ct}.{x}' for x in df.columns]
         out_dfs.append(df)
         df.to_csv(tempfile, sep = '\t', index = True, header = True)
         del df
-        log.log(f'Computed {label} in {t()-tic:.2f}s')
+        log.log(f'Computed {ct} in {t()-tic:.2f}s')
     out_dfs = pd.concat(out_dfs, axis = 1)
     adata.file.close()
     out_dfs.columns = out_dfs.columns.str.replace(' ','_').str.replace('/','_').str.replace('-','_')
