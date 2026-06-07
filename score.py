@@ -95,11 +95,12 @@ def singlebatchcepo(adata, genes, celltypes, mincells = 20, exprspct:float = 0.0
 
 def run_cepo(args):
     import anndata
+    input_file = proj.to_pathname('normalised', args.dataset, args.prefix)
     out_file = f'{args.out}/{args.prefix}.cepo.txt' if args.prefix.find(args.dataset) > -1 \
         else f'{args.out}/{args.dataset}_{args.prefix}.cepo.txt'
     if os.path.isfile(out_file) and not args.force: return
     tic = t()
-    adata = anndata.io.read_h5ad(args._in, 'r')
+    adata = anndata.io.read_h5ad(input_file, 'r')
     genes = adata.var.index
     log.log(f'Read in data: {adata.shape} in {t()-tic:.2f}s')
 
