@@ -94,7 +94,7 @@ def _add_regression_axis(
             ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
         else:
             ticks = ax.get_xticks()
-            ticks = np.log10(np.round(10**ticks, decimals = np.round(np.log10(max(10**ticks) - min(10**ticks)))))
+            ticks = np.log10(np.round(10**ticks, decimals = int(np.round(np.log10(max(10**ticks) - min(10**ticks))))))
             ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
             ticks = np.unique(ticks)
 
