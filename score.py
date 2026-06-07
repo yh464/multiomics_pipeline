@@ -145,9 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('prefix', type = str, help = 'Prefix for output files')
     parser = add_cmd_args(parser)
     args = parser.parse_args()
-
-    import os
-    args._in = os.path.realpath(args._in); args.out = os.path.realpath(args.out)
+    args.out = os.path.realpath(args.out)
 
     from _utils import logger, cmdhistory
     logger.splash(args)
