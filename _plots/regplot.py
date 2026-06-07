@@ -7,6 +7,7 @@ Version 1: 2025-11-13
 A plotting tool to plot regression plots
 '''
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -76,6 +77,32 @@ def _add_regression_axis(
         )
     for cat, cat_df in df.loc[df.index.difference(df_clipped.index)].groupby(hue, observed = True):
         sns.scatterplot(cat_df, x = x, y = y, color = palette[cat], s = s, alpha = alpha / 2, edgecolor = 'none', ax = ax, rasterized = True)
+    
+    if x.startswith('log'):
+        # regression is based on log(x) but the tick labels should be in linear scale
+        # label at log(x) = n, n+0.301, n+0.699, n+1, ... corresponding to x = 1e+n, 2e+n, 5e+n, 10e+n, ...
+        n_ticks = ax.get_xticks().size
+        xrange = xlim[1] - xlim[0]
+        if xrange >= n_ticks:
+            dist = xrange // n_ticks
+            ticks = np.arange(np.ceil(xlim[0]), np.floor(xlim[1]) + 1, dist)
+        elif xrange >= n_ticks / 3:
+            tick_l = min(np.ceil(xlim[0]), np.ceil(xlim[0])-np.log10(2), np.ceil(xlim[0])-np.log10(5))
+            tick_u = max(np.floor(xlim[1]), np.floor(xlim[1])+np.log10(2), np.floor(xlim[1])+np.log10(5))
+            ticks = np.arange(np.floor(tick_l), np.ceil(tick_u) + 1)
+            ticks = np.concatenate([ticks, ticks + np.log10(2), ticks + np.log10(5)])
+            ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
+        else:
+            ticks = ax.get_xticks()
+            ticks = np.log10(np.round(10**ticks, decimals = np.round(np.log10(max(10**ticks) - min(10**ticks)))))
+            ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
+            ticks = np.unique(ticks)
+
+        tick_labels = [f'{10**tick}' for tick in ticks]
+        ax.set_xticks(ticks, labels = tick_labels)
+        xlabel = xlabel.replace('log_','').replace('log10_','')
+        xlabel = xlabel[3:] if xlabel.startswith('log') else xlabel
+    
     ax.set_xlabel(xlabel, fontsize = 12)
     ax.set_ylabel(ylabel, fontsize = 12)
     return ax
