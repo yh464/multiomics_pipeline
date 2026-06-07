@@ -32,7 +32,7 @@ def main(args):
         cell_type = [col for col in args.cell_type if col in adata.obs.columns]
         if len(cell_type) == 0: cell_type = get_metadata_cols(dataset, prefix, input_string = 'cell type', adata = adata)
         # cmd = ['Rscript', 'sc_score.r','-i', h5, '-o', f'{args.out}/{prefix}', '--label'] + args.label
-        cmd = ['python', 'sc_score_cepo.py',dataset, prefix,'-o', args.out, '--label'] + cell_type
+        cmd = ['python', 'score.py',dataset, prefix,'-o', args.out, '--label'] + cell_type
         if args.cepo: cmd.append('--cepo')
         if args.force: cmd.append('-f')
         submitter.add(' '.join(cmd))
