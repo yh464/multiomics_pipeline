@@ -106,7 +106,7 @@ def run_cepo(args):
 
     out_dfs = []
     for ct in args.cell_type:
-        tempdir = f'/home/yh464/rds/hpc-work/temp/cepo/{os.path.basename(args._in)[:-5]}/{ct}'
+        tempdir = f'/home/yh464/rds/hpc-work/temp/cepo/{args.prefix}/{ct}'
         tempfile = f'{tempdir}/cepo.{ct}.txt'
         if os.path.isfile(tempfile) and not args.force:
             df = pd.read_table(tempfile, index_col = 0)
