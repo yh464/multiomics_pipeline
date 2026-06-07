@@ -78,7 +78,7 @@ def _add_regression_axis(
     for cat, cat_df in df.loc[df.index.difference(df_clipped.index)].groupby(hue, observed = True):
         sns.scatterplot(cat_df, x = x, y = y, color = palette[cat], s = s, alpha = alpha / 2, edgecolor = 'none', ax = ax, rasterized = True)
     
-    if x.startswith('log'):
+    if x.startswith('log') and xlabel != '':
         # regression is based on log(x) but the tick labels should be in linear scale
         # label at log(x) = n, n+0.301, n+0.699, n+1, ... corresponding to x = 1e+n, 2e+n, 5e+n, 10e+n, ...
         n_ticks = ax.get_xticks().size
