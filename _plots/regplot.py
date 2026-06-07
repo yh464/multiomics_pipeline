@@ -86,21 +86,23 @@ def _add_regression_axis(
         if xrange >= n_ticks:
             dist = xrange // n_ticks
             ticks = np.arange(np.ceil(xlim[0]), np.floor(xlim[1]) + 1, dist)
+            tick_labels = [f'{10**tick:.0f}' for tick in ticks]
         elif xrange >= 2:
             tick_l = min(np.ceil(xlim[0]), np.ceil(xlim[0])-np.log10(2), np.ceil(xlim[0])-np.log10(5))
             tick_u = max(np.floor(xlim[1]), np.floor(xlim[1])+np.log10(2), np.floor(xlim[1])+np.log10(5))
             ticks = np.arange(np.floor(tick_l), np.ceil(tick_u) + 1)
             ticks = np.concatenate([ticks, ticks + np.log10(2), ticks + np.log10(5)])
             ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
+            tick_labels = [f'{10**tick:.0f}' for tick in ticks]
         else:
             ticks = 10**ax.get_xticks()
             decimals = -int(np.log10(max(ticks) - min(ticks)))
             ticks = np.array([np.round(tick, decimals) if np.log10(tick) >= -decimals else round(tick, -int(np.log10(tick))) for tick in ticks])
+            tick_labels = [f'{tick:.{min(decimals,0)}f}' if np.log10(tick) >= -decimals else f'{tick:.{max(0, -int(np.log10(tick)))}f}' for tick in ticks]
             ticks = np.log10(ticks)
             ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
             ticks = np.unique(ticks)
 
-        tick_labels = [f'{10**tick}' for tick in ticks]
         ax.set_xticks(ticks, labels = tick_labels)
         xlabel = xlabel.replace('log_','').replace('log10_','')
         xlabel = xlabel[3:] if xlabel.startswith('log') else xlabel
