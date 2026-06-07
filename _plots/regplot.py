@@ -134,7 +134,9 @@ def temporal_regplot(
     '''
 
     # region: argument sense checks and basic config
-    df = df.dropna()
+    cols_to_check = [x] + list(y)
+    if hue is not None: cols_to_check.append(hue)
+    df = df[cols_to_check].dropna(subset = [x] + list(y)).copy() # drop rows with missing values in the relevant columns
     df[x] = df[x].astype(float) # ensure x is numeric
     if isinstance(ylabel, str): ylabel = [ylabel] # allow y to be a single column name
     y = list(y)
