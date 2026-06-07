@@ -86,15 +86,17 @@ def _add_regression_axis(
         if xrange >= n_ticks:
             dist = xrange // n_ticks
             ticks = np.arange(np.ceil(xlim[0]), np.floor(xlim[1]) + 1, dist)
-        elif xrange >= n_ticks / 3:
+        elif xrange >= 2:
             tick_l = min(np.ceil(xlim[0]), np.ceil(xlim[0])-np.log10(2), np.ceil(xlim[0])-np.log10(5))
             tick_u = max(np.floor(xlim[1]), np.floor(xlim[1])+np.log10(2), np.floor(xlim[1])+np.log10(5))
             ticks = np.arange(np.floor(tick_l), np.ceil(tick_u) + 1)
             ticks = np.concatenate([ticks, ticks + np.log10(2), ticks + np.log10(5)])
             ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
         else:
-            ticks = ax.get_xticks()
-            ticks = np.log10(np.round(10**ticks, decimals = int(np.round(np.log10(max(10**ticks) - min(10**ticks))))))
+            ticks = 10**ax.get_xticks()
+            decimals = -int(np.log10(max(ticks) - min(ticks)))
+            ticks = np.array([np.round(tick, decimals) if np.log10(tick) >= -decimals else round(tick, -int(np.log10(tick))) for tick in ticks])
+            ticks = np.log10(ticks)
             ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
             ticks = np.unique(ticks)
 
