@@ -358,7 +358,7 @@ class array_submitter():
         if self.intr: 
             for x in os.listdir(self.tmpdir):
                 if x.find('wrap') >= 0: continue
-                _logger.log(f'Running interactively: {x}')
+                _logger.log(f'Running interactively: {self.tmpdir}/{x}')
                 os.system(f'bash {self.tmpdir}/{x}')
             return
         time = self.timeout * self._count
