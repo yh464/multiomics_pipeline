@@ -13,10 +13,9 @@ proj = project()
 from _utils.logger import logger
 log = logger()
 import scanpy as sc
+import anndata as ad
 
 # quality control functions
-
-
 def check_spatial(dataset = None, prefix = None, spatial_key = 'spatial', adata = None):
     if (close := adata is None): adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
     if not (out := spatial_key in adata.obsm.keys()):
@@ -61,6 +60,13 @@ def get_embedding_keys(dataset = None, prefix = None, default = [], adata = None
     return selected_keys
 
 # functions for file operations
+def read_lazy(path, obs = True, var = True, obsm = True):
+    adata = ad.read_lazy(path)
+    if obs: adata.obs = adata.obs.to_memory()
+    if var: adata.var = adata.var.to_memory()
+    if obsm: adata.obsm = adata.obsm.to_memory()
+    return adata
+
 def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     import scanpy as sc
     if type(gene_subset) == str and os.path.isfile(gene_subset): gene_subset = open(gene_subset).read().splitlines()
