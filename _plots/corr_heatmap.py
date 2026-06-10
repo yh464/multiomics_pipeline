@@ -31,6 +31,9 @@ def corr_heatmap(summary, sort = True, absmax = None, autocor = False, annot = '
         5th column: correlation value
         and may contain a 'p' and 'q' column somewhere in the data frame
     '''
+
+    summary = summary.copy()
+
     # style sheet
     sns.set_theme(style = 'whitegrid')
 
@@ -138,7 +141,7 @@ def corr_heatmap(summary, sort = True, absmax = None, autocor = False, annot = '
                 spine.set_visible(False)
             
             # diagonal line
-            if i == j and autocor and i != '': ax[i,j].axline((0,0), slope = 1, c = 'k', zorder = 0)
+            if i == j and g1 == g2 and g1 != '': ax[i,j].axline((0,0), slope = 1, c = 'k', zorder = 0)
     
     if autocor: ax[0,0].annotate(annot,(0,0),xytext=(-4,-3.5), rotation = 45)
     
