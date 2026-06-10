@@ -127,7 +127,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
     score_cols = scores.columns.tolist()
     for emb_key in embedding_key:
         if not emb_key in adata.obsm.keys():
-            log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding', warning = True)
+            log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding')
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
         for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
@@ -188,7 +188,7 @@ def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim,
     rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
     if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.pdf', 
         embedding_key = rep_names, force = force)
-    else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf', warning = True)
+    else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf')
 
     # pseudotime regression plots
     time_columns = list(set(['age','time','pseudotime'] + time_key))
@@ -563,7 +563,7 @@ def run_scired(dataset, prefix, outdir, n_components = 50, n_genes = 2000,
     rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
     if len(rep_names) > 0: factor_embedding(y_varimax_, adata, f'{plot_dir}/{prefix}_scired_$factor_$embedding.pdf', 
         embedding_key = rep_names, force = force)
-    else: log.warn('No embedding found in adata.obsm, skipping scIRED factor embedding plots.', calling_file = 'run_scired', warning = True)
+    else: log.warn('No embedding found in adata.obsm, skipping scIRED factor embedding plots.', calling_file = 'run_scired')
 
     # pseudotime regression plots
     adata.obs.columns = adata.obs.columns.str.lower()
