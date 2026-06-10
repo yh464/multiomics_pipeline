@@ -166,6 +166,7 @@ def corr_heatmap_wide_format(corr_mat, **kwargs):
     Docstring for corr_heatmap_wide_format
     Converts a wide-format correlation matrix into long format and calls corr_heatmap.
     '''
+    corr_mat = corr_mat.copy()
     index_name = corr_mat.index.name if corr_mat.index.name is not None else ''
     columns_name = corr_mat.columns.name if corr_mat.columns.name is not None else ''
     corr_mat['index_tmp'] = corr_mat.index
