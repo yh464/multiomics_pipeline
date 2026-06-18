@@ -67,7 +67,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
                 fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_col['fcat_value'].dropna().values)
                 fcat_col['significance'] = fcat_col['fcat_value'] >= fcat_thr
                 fcat_col = fcat_col.rename(columns={'scired_factor': 'factor'})
-                fcat_col.to_csv(out_tabular.replace('$celltype', col), sep = '\t', index = True, header = True)
+                fcat_col.to_csv(out_tabular.replace('$celltype', col), sep = '\t', index = False, header = True)
             else: fcat_col = pd.read_table(out_tabular.replace('$celltype', col), index_col = 0)
             fig = corr_heatmap(fcat_col, sort = False, sig_col = 'significance')
             fig.savefig(out_fig.replace('$celltype', col), bbox_inches = 'tight')
@@ -232,19 +232,30 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
         return
     import scanpy as sc
     from sklearn.decomposition import NMF
+    import cnmf
     log.log(f'Projecting input data onto loadings from {projection_dataset}/{projection_prefix}', calling_file = 'cnmf_project')
     projected_prefix = prefix.replace('_hvg_','_proj_')
     projected_usages_file = proj.to_pathname('programmes_cnmf_scores', dataset, projected_prefix, k = k, dt = dt)
     os.makedirs(os.path.dirname(projected_usages_file), exist_ok = True)
     adata = sc.read_h5ad(h5ad_raw, 'r')
     if not os.path.isfile(projected_usages_file) or force:
-        adata_normalised = sc.read_h5ad(cnmf_obj.paths['normalized_counts'])
-        projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
-        projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
-        nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
-        nmf.components_ = projection_loadings.values.astype(adata_normalised.X.dtype)
-        projected_usages = nmf.transform(adata_normalised.X)
-        projected_usages = pd.DataFrame(projected_usages, index = adata_normalised.obs_names, 
+        adata_tpm = sc.read_h5ad(cnmf_obj.paths['tpm'])
+        sc.pp.scale(adata_tpm, zero_center = False)
+        cnmf_obj_proj = cnmf.cNMF(
+            output_dir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix))),
+            name = projection_prefix
+        )
+        proj_spectra_tpm = pd.read_table(cnmf_obj_proj.paths['consensus_spectra__txt'].replace(r'%d', str(k)).replace(r'%s', dt), index_col = 0)
+        proj_spectra_tpm = proj_spectra_tpm.loc[:, proj_spectra_tpm.columns.intersection(adata_tpm.var_names)]
+        tpm_stats = pd.DataFrame(**np.load(cnmf_obj_proj.paths['tpm_stats'], allow_pickle = True))
+        proj_spectra_tpm = proj_spectra_tpm.div(tpm_stats.loc[proj_spectra_tpm.columns, '__std'], axis = 1)
+        projected_usages = cnmf_obj_proj.refit_usage(adata_tpm.X, proj_spectra_tpm.values.astype(adata_tpm.X.dtype))
+        # projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
+        # projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
+        # nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
+        # nmf.components_ = projection_loadings.values.astype(adata_normalised.X.dtype)
+        # projected_usages = nmf.transform(adata_normalised.X)
+        projected_usages = pd.DataFrame(projected_usages, index = adata_tpm.obs_names, 
             columns = [i+1 for i in range(projected_usages.shape[1])])
         projected_usages.to_csv(projected_usages_file, sep = '\t', index = True, header = True)
     else:
