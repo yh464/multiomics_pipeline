@@ -250,8 +250,8 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
         tpm_stats = pd.DataFrame(**np.load(cnmf_obj_proj.paths['tpm_stats'], allow_pickle = True))
         proj_spectra_tpm = proj_spectra_tpm.div(tpm_stats.loc[proj_spectra_tpm.columns, '__std'], axis = 1)
         projected_usages = cnmf_obj_proj.refit_usage(adata_tpm.X, proj_spectra_tpm.values.astype(adata_tpm.X.dtype))
-        # projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
-        # projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_normalised.var_names)]
+        projection_loadings = pd.read_table(projection_loadings, index_col = 0) # after transpose, columns = genes, index = factors
+        projection_loadings = projection_loadings.loc[:, projection_loadings.columns.intersection(adata_tpm.var_names)]
         # nmf = NMF(n_components = projection_loadings.shape[0], init = 'random', random_state = seed, max_iter = 1000)
         # nmf.components_ = projection_loadings.values.astype(adata_normalised.X.dtype)
         # projected_usages = nmf.transform(adata_normalised.X)
