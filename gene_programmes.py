@@ -245,7 +245,7 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
             output_dir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_cnmf', projection_dataset, projection_prefix))),
             name = projection_prefix
         )
-        proj_spectra_tpm = pd.read_table(cnmf_obj_proj.paths['consensus_spectra__txt'].replace(r'%d', str(k)).replace(r'%s', dt), index_col = 0)
+        proj_spectra_tpm = pd.read_table(cnmf_obj_proj.paths['gene_spectra_tpm__txt'].replace(r'%d', str(k)).replace(r'%s', dt), index_col = 0)
         proj_spectra_tpm = proj_spectra_tpm.loc[:, proj_spectra_tpm.columns.intersection(adata_tpm.var_names)]
         tpm_stats = pd.DataFrame(**np.load(cnmf_obj_proj.paths['tpm_stats'], allow_pickle = True))
         proj_spectra_tpm = proj_spectra_tpm.div(tpm_stats.loc[proj_spectra_tpm.columns, '__std'], axis = 1)
