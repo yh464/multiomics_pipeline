@@ -19,8 +19,8 @@ def main(args):
     import scdrs
     import pandas as pd
 
-    ref = pd.read_table('/rds/project/rds-Nl99R8pHODQ/toolbox/magma/ENSG.gene.loc', header = None).drop_duplicates(4)
-    ref.columns = ['ENSG','CHR','START','STOP','GENE','DIRE']
+    ref = pd.read_table('/rds/project/rds-Nl99R8pHODQ/toolbox/magma/ENSG.gene.loc', header = None,
+        names = ['ENSG','CHR','START','STOP','GENE','DIRE']).drop_duplicates('GENE')
     h5ad_raw = proj.to_pathname('raw', args.dataset, args.prefix)
     h5ad_norm = proj.to_pathname('normalised', args.dataset, args.prefix)
     h5ad_scdrs = proj.to_pathname('scdrs', args.dataset, args.prefix)

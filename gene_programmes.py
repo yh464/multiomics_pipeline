@@ -57,16 +57,20 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
                 log.warn(f'Factor to explain {col} has more than 100 categories, skipping.', calling_file = 'factor_importance')
                 continue
             if not os.path.isfile(out_tabular.replace('$celltype', col)):
+                cell_type_mean = scores.groupby(adata.obs[col], observed=True).mean().reset_index(names = 'cell_type').melt(
+                    id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'mean_score')
+                cell_type_sd = scores.groupby(adata.obs[col], observed=True).std().reset_index(names = 'cell_type').melt(
+                    id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'sd_score')
                 fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
                     scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
-                fcat_col['explained_factor'] = fcat_col.index
-                fcat_col = fcat_col.dropna().melt(id_vars = 'explained_factor', var_name = 'scired_factor', value_name = 'fcat_value')
+                fcat_col['cell_type'] = fcat_col.index
+                fcat_col = fcat_col.dropna().melt(id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'fcat_value')
                 # the ensembleFCA function will automatically name the column as 'scired_factor' even if the input is not from sciRED
-                fcat_col.insert(0, 'explained_group', col)
+                fcat_col.insert(0, 'annotation', col)
                 fcat_col.insert(2, 'xlabel', 'factor')
                 fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_col['fcat_value'].dropna().values)
                 fcat_col['significance'] = fcat_col['fcat_value'] >= fcat_thr
-                fcat_col = fcat_col.rename(columns={'scired_factor': 'factor'})
+                fcat_col = fcat_col.merge(cell_type_mean).merge(cell_type_sd).rename(columns={'scired_factor': 'factor'})
                 fcat_col.to_csv(out_tabular.replace('$celltype', col), sep = '\t', index = False, header = True)
             else: fcat_col = pd.read_table(out_tabular.replace('$celltype', col), index_col = 0)
             fig = corr_heatmap(fcat_col, sort = False, sig_col = 'significance')
