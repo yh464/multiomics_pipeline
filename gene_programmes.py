@@ -46,6 +46,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
     if out_fig.find('$celltype') == -1: out_fig = out_fig.replace('.pdf', '_$celltype.pdf')
 
     if isinstance(scores, pd.DataFrame): scores = scores.values # FCAT function accepts numpy array as input
+    scores_df = pd.DataFrame(scores, index = adata.obs_names, columns = [f'F{i+1}' for i in range(scores.shape[1])])
     fcat_mat = []
     for col in factors_to_explain:
         if col not in adata.obs.columns:
@@ -57,10 +58,6 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
                 log.warn(f'Factor to explain {col} has more than 100 categories, skipping.', calling_file = 'factor_importance')
                 continue
             if not os.path.isfile(out_tabular.replace('$celltype', col)):
-                cell_type_mean = scores.groupby(adata.obs[col], observed=True).mean().reset_index(names = 'cell_type').melt(
-                    id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'mean_score')
-                cell_type_sd = scores.groupby(adata.obs[col], observed=True).std().reset_index(names = 'cell_type').melt(
-                    id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'sd_score')
                 fcat_col = sciRED.ensembleFCA.FCAT(adata.obs[col],  
                     scores, scale = 'standard', mean = 'arithmatic') # author spelling is incorrect
                 fcat_col['cell_type'] = fcat_col.index
@@ -70,6 +67,11 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
                 fcat_col.insert(2, 'xlabel', 'factor')
                 fcat_thr = sciRED.ensembleFCA.get_otsu_threshold(fcat_col['fcat_value'].dropna().values)
                 fcat_col['significance'] = fcat_col['fcat_value'] >= fcat_thr
+
+                cell_type_mean = scores_df.groupby(adata.obs[col], observed=True).mean().reset_index(names = 'cell_type').melt(
+                    id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'mean_score')
+                cell_type_sd = scores_df.groupby(adata.obs[col], observed=True).std().reset_index(names = 'cell_type').melt(
+                    id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'sd_score')
                 fcat_col = fcat_col.merge(cell_type_mean).merge(cell_type_sd).rename(columns={'scired_factor': 'factor'})
                 fcat_col.to_csv(out_tabular.replace('$celltype', col), sep = '\t', index = False, header = True)
             else: fcat_col = pd.read_table(out_tabular.replace('$celltype', col), index_col = 0)
