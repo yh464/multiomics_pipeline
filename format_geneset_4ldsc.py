@@ -81,6 +81,8 @@ def main(args):
 
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gset_names)], axis = 1)
             for g, row in tqdm(gset_matrix.iterrows()):
+                start = geneloc_chr.loc[g, 'FROM']; end = geneloc_chr.loc[g, 'TO']
+                if len(start) > 1: log.warn(f'Gene {g} has multiple locations, using the first one'); start = start[0]; end = end[0]
                 out_chr.loc[out_chr['BP'].between(geneloc_chr.loc[g, 'FROM'], geneloc_chr.loc[g, 'TO']), row == 1] = 1
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
