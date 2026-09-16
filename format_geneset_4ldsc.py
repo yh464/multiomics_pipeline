@@ -80,7 +80,7 @@ def main(args):
             gset_matrix = gset_matrix.loc[gset_matrix.sum(axis = 1) > 0, :]
 
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gset_names)], axis = 1)
-            for g, row in tqdm(gset_matrix.iterrows()):
+            for g, row in tqdm(gset_matrix.iterrows(), total = gset_matrix.shape[0]):
                 start = geneloc_chr.loc[g, 'FROM']; end = geneloc_chr.loc[g, 'TO']
                 if isinstance(start, pd.Series): 
                     log.warn(f'Gene {g} has multiple locations, using the first one'); 
