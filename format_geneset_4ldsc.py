@@ -37,6 +37,10 @@ def main(args):
             log.warn(f'No gene set or gene score files found for dataset {dataset}, skipping'); continue
         gsets += [(x, x.replace(f'{gene_set}/', '')[:-4]) for x in gset]; gscores += [(x, x.replace(f'{gene_score}/', '')[:-4]) for x in gscore]
 
+    log.log(f'Found {len(gsets)} gene set datasets and {len(gscores)} gene score datasets for processing')
+    for _, prefix in gsets: log.log(f'    {prefix} (gene set)')
+    for _, prefix in gscores: log.log(f'    {prefix} (gene score)')
+
     if args.gnova and len(gscores) > 0:
         log.warn('GNOVA analysis is only supported for gene sets, skipping following files')
         for _, prefix in gscores: log.warn(f'    {prefix}')
