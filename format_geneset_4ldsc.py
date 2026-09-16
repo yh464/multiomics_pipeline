@@ -96,6 +96,7 @@ def main(args):
 
             if args.gnova:
                 tmp = out_chr.iloc[:, 5:]
+                tmp['no_annotation'] = 0
                 tmp.loc[tmp.sum(axis = 1) == 0, 'no_annotation'] = 1
                 tmp.to_csv(out_gnova.replace('%chrom', str(chrom)), sep = '\t', index = False)
             log.log(f'Saved gene set annotations for dataset {prefix} on chromosome {chrom}')
