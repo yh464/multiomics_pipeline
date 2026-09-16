@@ -23,7 +23,7 @@ def main(args):
     gsets = []; gscores = []
 
     # read gene location file
-    geneloc = pd.read_table(args.geneloc, header = None, index_col = 0, names = ['CHR','FROM','TO','DIR','LABEL'])
+    geneloc = pd.read_table(args.geneloc, header = None, index_col = 0, names = ['CHR','FROM','TO','LABEL','DIR'])
     geneloc['FROM'] -= args.window[0]*1000; geneloc['TO'] += args.window[-1]*1000
     geneloc = geneloc.loc[~geneloc['CHR'].isin(['X','Y','MT']), :] # autosomes only
     geneloc['CHR'] = geneloc['CHR'].astype(int)
@@ -108,7 +108,7 @@ if __name__ == '__main__':
     parser = slurm_parser(description = 'A quick utility to process gene sets for stratified LDSC analysis')
     parser.add_argument('datasets', nargs = '+', help = 'Gene sets')
     parser.add_argument('--chrom', default = 'all', help = 'Chromosome to process (NB manually specifying this option will trigger interactive run)')
-    parser.add_argument('--window', nargs = '+', default = [10, 10], help = 'Window size (kb) for gene set analysis, enter one value for symmetric windows or two values for up/downstream')
+    parser.add_argument('--window', nargs = '+', default = [10, 10], type = int, help = 'Window size (kb) for gene set analysis, enter one value for symmetric windows or two values for up/downstream')
     parser.add_argument('--geneloc', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/magma/ENSG.gene.loc', help = 'Gene location file for MAGMA')
     parser.add_argument('--ref', default = '/rds/project/rds-Nl99R8pHODQ/ref/1000g_eur_ldsc/chr$chrom.bim', help = 'Reference SNP list for LDSC')
     parser.add_argument('--gnova', action = 'store_true', help = 'Format gene sets for GNOVA analysis')
