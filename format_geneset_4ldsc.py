@@ -95,7 +95,7 @@ def main(args):
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
             if args.gnova:
-                out_chr.iloc[:, 5:].to_csv(out_gnova.replace('%chrom', str(chrom)), sep = '\t', index = False, header = False)
+                out_chr.iloc[:, 5:].to_csv(out_gnova.replace('%chrom', str(chrom)), sep = '\t', index = False)
             log.log(f'Saved gene set annotations for dataset {prefix} on chromosome {chrom}')
 
         # process gene scores
