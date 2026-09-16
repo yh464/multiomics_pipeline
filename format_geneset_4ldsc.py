@@ -82,9 +82,7 @@ def main(args):
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gset_names)], axis = 1)
             for g, row in tqdm(gset_matrix.iterrows(), total = gset_matrix.shape[0]):
                 start = geneloc_chr.loc[g, 'FROM']; end = geneloc_chr.loc[g, 'TO']
-                try: out_chr.loc[out_chr['BP'].between(start, end), row == 1] = 1
-                except:
-                    print(start); print(end); raise
+                out_chr.loc[out_chr['BP'].between(start, end), row.index[row == 1]] = 1
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
             if args.gnova:
