@@ -86,7 +86,7 @@ def main(args):
                     log.warn(f'Gene {g} has multiple locations, using the first one'); 
                     print(start, end)
                     start = start[0]; end = end[0]
-                out_chr.loc[out_chr['BP'].between(geneloc_chr.loc[g, 'FROM'], geneloc_chr.loc[g, 'TO']), row == 1] = 1
+                out_chr.loc[out_chr['BP'].between(start, end), row == 1] = 1
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
             if args.gnova:
@@ -102,8 +102,13 @@ def main(args):
             gscore_data = gscore_data.loc[gscore_data.index.isin(geneloc_chr.index), :]
 
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gscore_data.columns)], axis = 1)
-            for g, row in tqdm(gscore_data.iterrows()):
-                out_chr.loc[out_chr['BP'].between(geneloc_chr.loc[g, 'FROM'], geneloc_chr.loc[g, 'TO']), gscore_data.columns] += row['SCORE']
+            for g, row in tqdm(gscore_data.iterrows(), total = gscore_data.shape[0]):
+                start = geneloc_chr.loc[g, 'FROM']; end = geneloc_chr.loc[g, 'TO']
+                if isinstance(start, pd.Series): 
+                    log.warn(f'Gene {g} has multiple locations, using the first one'); 
+                    print(start, end)
+                    start = start[0]; end = end[0]
+                out_chr.loc[out_chr['BP'].between(start, end), gscore_data.columns] += row['SCORE']
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
             log.log(f'Saved gene score annotations for dataset {prefix} on chromosome {chrom}')
 
