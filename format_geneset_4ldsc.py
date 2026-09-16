@@ -71,6 +71,11 @@ def main(args):
         for gset, prefix in gsets:
             os.makedirs(f'{out_dir}/{prefix}', exist_ok = True)
             out_file = f'{out_dir}/{prefix}/%chrom.annot'
+            out_gnova = f'{out_dir}/{prefix}/%chrom.gnova'
+            if os.path.isfile(out_file.replace('%chrom', str(chrom))) and not args.force and (
+                os.path.isfile(out_gnova.replace('%chrom', str(chrom))) or not args.gnova):
+                log.log(f'Annotation file for dataset {prefix} on chromosome {chrom} already exists, skipping'); continue
+
             gset_data = open(gset).read().splitlines()
             gset_names = [prefix + '_' + x.split()[0] for x in gset_data]
 
@@ -86,7 +91,6 @@ def main(args):
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
             if args.gnova:
-                out_gnova = f'{out_dir}/{prefix}/%chrom.gnova'
                 out_chr.iloc[:, 5:].to_csv(out_gnova.replace('%chrom', str(chrom)), sep = '\t', index = False, header = False)
             log.log(f'Saved gene set annotations for dataset {prefix} on chromosome {chrom}')
 
@@ -94,6 +98,9 @@ def main(args):
         for gscore, prefix in gscores:
             os.makedirs(f'{out_dir}/{prefix}', exist_ok = True)
             out_file = f'{out_dir}/{prefix}/%chrom.annot'
+            if os.path.isfile(out_file.replace('%chrom', str(chrom))) and not args.force:
+                log.log(f'Annotation file for dataset {prefix} on chromosome {chrom} already exists, skipping'); continue
+
             gscore_data = pd.read_table(gscore, header = None, index_col = 0)
             gscore_data = gscore_data.loc[gscore_data.index.isin(geneloc_chr.index), :]
 
