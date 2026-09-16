@@ -23,7 +23,7 @@ def main(args):
     gsets = []; gscores = []
 
     # read gene location file
-    geneloc = pd.read_table(args.geneloc, header = None, index_col = 0, names = ['CHR','FROM','TO','LABEL','DIR'])
+    geneloc = pd.read_table(args.geneloc, header = None, names = ['ENSG','CHR','FROM','TO','LABEL','DIR']).drop_duplicates('ENSG').set_index('ENSG')
     geneloc['FROM'] -= args.window[0]*1000; geneloc['TO'] += args.window[-1]*1000
     geneloc = geneloc.loc[~geneloc['CHR'].isin(['X','Y','MT']), :] # autosomes only
     geneloc['CHR'] = geneloc['CHR'].astype(int)
@@ -82,11 +82,9 @@ def main(args):
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gset_names)], axis = 1)
             for g, row in tqdm(gset_matrix.iterrows(), total = gset_matrix.shape[0]):
                 start = geneloc_chr.loc[g, 'FROM']; end = geneloc_chr.loc[g, 'TO']
-                if isinstance(start, pd.Series): 
-                    log.warn(f'Gene {g} has multiple locations, using the first one'); 
-                    print(start, end)
-                    start = start[0]; end = end[0]
-                out_chr.loc[out_chr['BP'].between(start, end), row == 1] = 1
+                try: out_chr.loc[out_chr['BP'].between(start, end), row == 1] = 1
+                except:
+                    print(start); print(end); raise
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
             if args.gnova:
@@ -104,10 +102,6 @@ def main(args):
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gscore_data.columns)], axis = 1)
             for g, row in tqdm(gscore_data.iterrows(), total = gscore_data.shape[0]):
                 start = geneloc_chr.loc[g, 'FROM']; end = geneloc_chr.loc[g, 'TO']
-                if isinstance(start, pd.Series): 
-                    log.warn(f'Gene {g} has multiple locations, using the first one'); 
-                    print(start, end)
-                    start = start[0]; end = end[0]
                 out_chr.loc[out_chr['BP'].between(start, end), gscore_data.columns] += row['SCORE']
             out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
             log.log(f'Saved gene score annotations for dataset {prefix} on chromosome {chrom}')
