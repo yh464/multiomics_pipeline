@@ -60,7 +60,7 @@ def main(args):
         chrom = int(args.chrom)
         if len(gsets) + len(gscores) > 1: log.warn('Multiple datasets found, check if names are duplicated; files may be overwritten')
 
-        ref_chr = pd.read_table(args.ref.replace('$chrom', str(chrom)), header = None, usecols = [0,1,3], names = ['CHR','SNP','BP'])
+        ref_chr = pd.read_table(args.ref.replace('%chrom', str(chrom)), header = None, usecols = [0,1,3], names = ['CHR','SNP','BP'])
         ref_chr = ref_chr.loc[:, ['CHR','BP','SNP']]
         ref_chr['CM'] = 0; ref_chr['base'] = 1
         log.log(f'Read {ref_chr.shape[0]} SNPs from reference file for chromosome {chrom}')
@@ -70,7 +70,7 @@ def main(args):
         # process gene sets
         for gset, prefix in gsets:
             os.makedirs(f'{out_dir}/{prefix}', exist_ok = True)
-            out_file = f'{out_dir}/{prefix}/$chrom.annot'
+            out_file = f'{out_dir}/{prefix}/%chrom.annot'
             gset_data = open(gset).read().splitlines()
             gset_names = [prefix + '_' + x.split()[0] for x in gset_data]
 
@@ -82,24 +82,24 @@ def main(args):
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gset_names)], axis = 1)
             for g, row in tqdm(gset_matrix.iterrows()):
                 out_chr.loc[out_chr['BP'].between(geneloc_chr.loc[g, 'FROM'], geneloc_chr.loc[g, 'TO']), row == 1] = 1
-            out_chr.to_csv(out_file.replace('$chrom', str(chrom)), sep = '\t', index = False)
+            out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
 
             if args.gnova:
-                out_gnova = f'{out_dir}/{prefix}/$chrom.gnova'
-                out_chr.iloc[:, 5:].to_csv(out_gnova.replace('$chrom', str(chrom)), sep = '\t', index = False, header = False)
+                out_gnova = f'{out_dir}/{prefix}/%chrom.gnova'
+                out_chr.iloc[:, 5:].to_csv(out_gnova.replace('%chrom', str(chrom)), sep = '\t', index = False, header = False)
             log.log(f'Saved gene set annotations for dataset {prefix} on chromosome {chrom}')
 
         # process gene scores
         for gscore, prefix in gscores:
             os.makedirs(f'{out_dir}/{prefix}', exist_ok = True)
-            out_file = f'{out_dir}/{prefix}/$chrom.annot'
+            out_file = f'{out_dir}/{prefix}/%chrom.annot'
             gscore_data = pd.read_table(gscore, header = None, index_col = 0)
             gscore_data = gscore_data.loc[gscore_data.index.isin(geneloc_chr.index), :]
 
             out_chr = pd.concat([ref_chr, pd.DataFrame(0, index = ref_chr.index, columns = gscore_data.columns)], axis = 1)
             for g, row in tqdm(gscore_data.iterrows()):
                 out_chr.loc[out_chr['BP'].between(geneloc_chr.loc[g, 'FROM'], geneloc_chr.loc[g, 'TO']), gscore_data.columns] += row['SCORE']
-            out_chr.to_csv(out_file.replace('$chrom', str(chrom)), sep = '\t', index = False)
+            out_chr.to_csv(out_file.replace('%chrom', str(chrom)), sep = '\t', index = False)
             log.log(f'Saved gene score annotations for dataset {prefix} on chromosome {chrom}')
 
 
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('--chrom', default = 'all', help = 'Chromosome to process (NB manually specifying this option will trigger interactive run)')
     parser.add_argument('--window', nargs = '+', default = [10, 10], type = int, help = 'Window size (kb) for gene set analysis, enter one value for symmetric windows or two values for up/downstream')
     parser.add_argument('--geneloc', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/magma/ENSG.gene.loc', help = 'Gene location file for MAGMA')
-    parser.add_argument('--ref', default = '/rds/project/rds-Nl99R8pHODQ/ref/1000g_eur_ldsc/chr$chrom.bim', help = 'Reference SNP list for LDSC')
+    parser.add_argument('--ref', default = '/rds/project/rds-Nl99R8pHODQ/ref/1000g_eur_ldsc/chr%chrom.bim', help = 'Reference SNP list for LDSC')
     parser.add_argument('--gnova', action = 'store_true', help = 'Format gene sets for GNOVA analysis')
     parser.add_argument('-f', '--force', action = 'store_true', help = 'Force overwrite')
     args = parser.parse_args()
