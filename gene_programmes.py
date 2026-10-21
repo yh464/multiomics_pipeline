@@ -11,6 +11,7 @@ Pipelines to identify gene expression programmes from scRNA-seq data
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 import os, time
 from fnmatch import fnmatch
@@ -24,6 +25,8 @@ proj = project()
 from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
 from _plots.regplot import temporal_regplot
+sns.set_theme(style = 'ticks', font_scale = 1.2, palette = 'colorblind')
+mpl.rcParams['font.family'] = 'sans-serif'
 
 # region: factor downstream analyses
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
