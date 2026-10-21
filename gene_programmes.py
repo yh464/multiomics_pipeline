@@ -365,14 +365,22 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
         # error/stability plots
         cnmf_plot_prefix = cnmf_obj.paths['k_selection_plot'].replace('.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}')
-        if not os.path.isfile(f'{cnmf_plot_prefix}.pdf') or force:
+        if not os.path.isfile(f'{cnmf_plot_prefix}.png') or force:
             cnmf_obj.k_selection_plot()
             os.rename(cnmf_obj.paths['k_selection_plot'], f'{cnmf_plot_prefix}.png')
 
-            # publication-quality PDF incorporating scree plot
-            with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
-                k_selection_stats = pd.DataFrame(**file)
-            with np.load(cnmf_obj.paths['local_density_cache'], allow_pickle = True) as file:
+        with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
+            k_selection_stats = pd.DataFrame(**file)
+        k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
+        log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
+    else: 
+        k_optim = n_components[0]
+        log.log(f'Proceeding with k = {k_optim} for downstream analysis', calling_file = 'run_cnmf')
+
+    # publication-quality PDF incorporating scree plot and local density histogram
+    if not os.path.isfile(f'{cnmf_plot_prefix}.pdf') or force:
+        try:
+            with np.load(cnmf_obj.paths['local_density_cache'].replace('%d', str(k_optim)), allow_pickle = True) as file:
                 local_density = pd.DataFrame(**file).iloc[:,0]
             k_selection_stats.k = k_selection_stats.k.astype(int)
 
@@ -423,15 +431,10 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             ax_density.text(0.55, 0.8, f'{n_removed}/{n_total} ({n_removed/n_total:.1%})\nspectra removed', 
                 transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center')
             fig.savefig(f'{cnmf_plot_prefix}.pdf', bbox_inches = 'tight')
-            
-        else:
-            with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
-                k_selection_stats = pd.DataFrame(**file)
-        k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
-        log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
-    else: 
-        k_optim = n_components[0]
-        log.log(f'Proceeding with k = {k_optim} for downstream analysis', calling_file = 'run_cnmf')
+            log.log(f'cNMF k-selection and local density plots saved to {cnmf_plot_prefix}.pdf', calling_file = 'run_cnmf')
+        except:
+            log.warn('Failed to generate the joint local density / k selection plot. Check for missing files', calling_file = 'run_cnmf')
+            log.warn('Ignore this warning if specifying a specific k value without trying a range of k values', calling_file = 'run_cnmf')
 
     # consensus factor decomposition
     log.log(f'Conducting consensus factor decomposition with k = {k_optim} and density threshold = {density_threshold}', calling_file = 'run_cnmf')
