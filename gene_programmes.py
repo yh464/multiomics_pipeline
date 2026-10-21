@@ -11,6 +11,7 @@ Pipelines to identify gene expression programmes from scRNA-seq data
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import os, time
 from fnmatch import fnmatch
 from multiprocessing import cpu_count, Pool
@@ -272,7 +273,7 @@ def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw,
     cnmf_downstream(projected_usages, projection_loadings, adata, cell_type, outdir, projected_prefix, projection_loadings.shape[0], 
         embedding, time_key, force, savedir = None)
 
-def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, 
+def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_threshold = 0.1, n_genes = 2000,
     cell_type = [], embedding = ['X_umap'], time_key = ['pseudotime'],
     seed = 19260817, force = False, worker_id = 0, n_iter = 100, savedir = None, projection = [], project_only = False):
     '''
@@ -313,7 +314,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         not os.access(cnmf_obj.paths['normalized_counts'], os.R_OK) or not os.access(cnmf_obj.paths['tpm'], os.R_OK):
         if worker_id == -1: # prevent other workers from simultaneously writing files
             log.log('Worker id is set to -1, this programme will only pre-process the h5ad file and exit')
-            cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed)
+            cnmf_obj.prepare(counts_fn = h5ad_raw, components = n_components, n_iter = n_iter, seed = seed, num_highvar_genes = n_genes)
             return
         else: 
             log.log('Pre-processing step is not complete, please re-run the programme setting worker_id to -1')
@@ -356,29 +357,76 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             sc.write(cnmf_obj.paths['normalized_counts'].replace('.h5ad','.pca.h5ad'), adata) # prevent old file from being overwritten
             os.remove(cnmf_obj.paths['normalized_counts'])
             os.rename(cnmf_obj.paths['normalized_counts'].replace('.h5ad','.pca.h5ad'), cnmf_obj.paths['normalized_counts'])
-        total_variance_explained = np.cumsum(adata.uns['pca']['variance_ratio'])
-        fig, ax = plt.subplots(figsize = (5, 3))
-        ax.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), adata.uns['pca']['variance_ratio'], color = 'k')
-        ax1 = ax.twinx()
-        ax1.plot(np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), total_variance_explained, color = 'r')
-        ax.set_title('PCA Scree Plot')
-        ax.set_xlabel('Principal Component')
-        ax.set_ylabel('Variance Explained')
-        fig.savefig(f'{outdir}/{prefix}/{prefix}_cnmf_k{total_variance_explained.size}_screeplot.pdf', bbox_inches = 'tight')
-        plt.close(fig)
-        log.log(f'PCA scree plot saved to {outdir}/{prefix}/{prefix}_cnmf_k{total_variance_explained.size}_screeplot.pdf', calling_file = 'run_cnmf')
         log.log(f'{(adata.uns["pca"]["variance_ratio"] > 0.05).sum()} PCs explain more than 5% variance', calling_file = 'run_cnmf')
         log.log(f'{(adata.uns["pca"]["variance_ratio"] > 0.01).sum()} PCs explain more than 1% variance', calling_file = 'run_cnmf')
         log.log('First 10 PCs:', calling_file = 'run_cnmf')
         for i in range(10):
             log.log(f'    PC{i+1}: {adata.uns["pca"]["variance_ratio"][i]*100:.2f}%', calling_file = 'run_cnmf')
 
-        # error/stability plot
-        cnmf_obj.k_selection_plot()
-        os.rename(cnmf_obj.paths['k_selection_plot'], cnmf_obj.paths['k_selection_plot'].replace(
-            '.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}.png'))
-        with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
-            k_selection_stats = pd.DataFrame(**file)
+        # error/stability plots
+        cnmf_plot_prefix = cnmf_obj.paths['k_selection_plot'].replace('.png', f'_{min(n_components)}_{max(n_components)}_{int(n_components[1]-n_components[0])}')
+        if not os.path.isfile(f'{cnmf_plot_prefix}.pdf') or force:
+            cnmf_obj.k_selection_plot()
+            os.rename(cnmf_obj.paths['k_selection_plot'], f'{cnmf_plot_prefix}.png')
+
+            # publication-quality PDF incorporating scree plot
+            with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
+                k_selection_stats = pd.DataFrame(**file)
+            with np.load(cnmf_obj.paths['local_density_cache'], allow_pickle = True) as file:
+                local_density = pd.DataFrame(**file).iloc[:,0]
+            k_selection_stats.k = k_selection_stats.k.astype(int)
+
+            # merge with PCA
+            pca_df = pd.DataFrame({'k': np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), 'pca_var_ratio': adata.uns['pca']['variance_ratio']})
+            pca_df = pca_df.loc[pca_df.k <= k_selection_stats.k.max(), :]
+            k_selection_stats = pd.merge(k_selection_stats, pca_df, on='k', how = 'outer')
+
+            fig, ax = plt.subplots(1,2, figsize = (8, 2.5), width_ratios = (5,3))
+            ax1 = ax[0]; ax2 = ax1.twinx(); ax3 = ax1.twinx(); ax_density = ax[1]
+            for plot_ax, stat, label, colour, style in zip(
+                [ax1, ax2, ax3],
+                ['prediction_error','silhouette','pca_var_ratio'],
+                ['Prediction error','Silhouette score','PCA variance ratio'],
+                ['#1f78b4','#33a02c','#000000'],
+                ['--', '-', '-.']
+            ):
+                plot_ax.plot(k_selection_stats.k, k_selection_stats['stat'], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
+                plot_ax.splines[['top', 'right', 'bottom']].set_visible(False)
+                plot_ax.set_xticks(np.arange(min(n_components), max(n_components)+1, 5))
+                plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
+                plot_ax.yaxis.set_label_position('left')
+                plot_ax.yaxis.tick_left()
+                plot_ax.spines['left'].set_color(colour)
+                plot_ax.tick_params(axis = 'y', colors = colour)
+                plot_ax.set_ylabel('')
+            ax1.grid(True, 'both','x')
+            ax2.spines['left'].set_position(('outward', 40))
+            ax3.spines['left'].set_position(('outward', 80))
+            ax1.set_xlabel('Number of components (k)', fontsize = 14)
+            lines = ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
+            ax1.legend(lines[:3], ['Prediction error','Silhouette score','PCA variance ratio'], loc = 'upper center', frameon = False,
+                bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5)
+
+            sns.histplot(local_density.values, ax = ax_density, binwidth = 0.02, color = '#6a3d9a')
+            bin_counts = np.histogram(local_density.values, bins = np.arange(0, 1.05, 0.02))[0]
+            bin_counts_sorted = np.sort(bin_counts)[::-1]
+            ax_density.set_xlim(0, 1.05)
+            ax_density.set_ylim(0, min(2*bin_counts_sorted[1], bin_counts_sorted[0]+1))
+            ax_density.text(0, 1.02, f'{bin_counts[0]}', transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center', color = '#6a3d9a')
+            ax_density.spines[['top', 'left']].set_visible(False)
+            ax_density.tick_params(axis = 'y', left = False, labelleft = False, right = True, labelright = True)
+            ax_density.tick_params(axis = 'x', bottom = True, labelbottom = True)
+            ax_density.set_ylabel('')
+            ax_density.set_xlabel('Mean distance to\n 30% nearest neughbours', fontsize = 14)
+            ax_density.axvline(x = density_threshold, c = '0.6', linestyle = '--', linewidth = 2)
+            n_total = len(local_density); n_removed = (local_density > density_threshold).sum()
+            ax_density.text(0.55, 0.8, f'{n_removed}/{n_total} ({n_removed/n_total:.1%})\nspectra removed', 
+                transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center')
+            fig.savefig(f'{cnmf_plot_prefix}.pdf', bbox_inches = 'tight')
+            
+        else:
+            with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
+                k_selection_stats = pd.DataFrame(**file)
         k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
         log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
     else: 
@@ -662,7 +710,7 @@ def main(args):
     scired_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_scired', args.dataset, args.prefix)))
     spectra_outdir = os.path.dirname(os.path.dirname(proj.to_pathname('programmes_spectra', args.dataset, args.prefix)))
     if args.cnmf:
-        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt,
+        run_cnmf(args.dataset, args.prefix, cnmf_outdir, n_components = args.cnmf_components, density_threshold = args.cnmf_dt, n_genes = args.cnmf_genes,
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817,
             force = args.force, worker_id = args.worker, savedir = args.magma_out if args.magma else None, projection = projection, project_only = args.project_only)
     if args.scired:
@@ -676,6 +724,8 @@ def add_cmd_args(parser):
     parser.add_argument('--cnmf', action = 'store_true', help = 'Run consensus NMF to identify gene programmes')
     parser.add_argument('--cnmf_components', type = int, nargs = '+', default = (5, 40, 1),
         help = 'Number of components to identify for cNMF (start, stop, step), default: 5 40 1')
+    parser.add_argument('--cnmf_genes', type = int, default = 2000,
+        help = 'Number of highly variable genes to use for cNMF (default: 2000)')
     parser.add_argument('--cnmf_dt', type = float, default = 0.1,
         help = 'Density threshold for cNMF consensus spectra (default: 0.1)')
     parser.add_argument('--scired', action = 'store_true', help = 'Run scIRED to identify gene programmes')
