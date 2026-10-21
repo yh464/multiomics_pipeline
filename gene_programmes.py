@@ -399,7 +399,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
                 ['--', '-', '-.']
             ):
                 plot_ax.plot(k_selection_stats.k, k_selection_stats[stat], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
-                plot_ax.splines[['top', 'right', 'bottom']].set_visible(False)
+                plot_ax.spines[['top', 'right', 'bottom']].set_visible(False)
                 plot_ax.set_xticks(np.arange(min(n_components), max(n_components)+1, 5))
                 plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
                 plot_ax.yaxis.set_label_position('left')
