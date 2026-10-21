@@ -435,6 +435,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         except:
             log.warn('Failed to generate the joint local density / k selection plot. Check for missing files', calling_file = 'run_cnmf')
             log.warn('Ignore this warning if specifying a specific k value without trying a range of k values', calling_file = 'run_cnmf')
+            raise
 
     # consensus factor decomposition
     log.log(f'Conducting consensus factor decomposition with k = {k_optim} and density threshold = {density_threshold}', calling_file = 'run_cnmf')
