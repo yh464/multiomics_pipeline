@@ -26,7 +26,7 @@ from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
 from _plots.regplot import temporal_regplot
 sns.set_theme(style = 'ticks', font_scale = 1.2, palette = 'colorblind')
-mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.family'] = 'Arial'
 
 # region: factor downstream analyses
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
@@ -392,7 +392,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             pca_df = pca_df.loc[pca_df.k <= k_selection_stats.k.max(), :]
             k_selection_stats = pd.merge(k_selection_stats, pca_df, on='k', how = 'outer')
 
-            fig, ax = plt.subplots(1,2, figsize = (8, 2.5), width_ratios = (5,3))
+            fig, ax = plt.subplots(1,2, figsize = (8, 2), width_ratios = (5,3))
             ax1 = ax[0]; ax2 = ax1.twinx(); ax3 = ax1.twinx(); ax_density = ax[1]
             for plot_ax, stat, label, colour, style in zip(
                 [ax1, ax2, ax3],
