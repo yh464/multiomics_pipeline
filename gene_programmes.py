@@ -26,7 +26,7 @@ from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
 from _plots.regplot import temporal_regplot
 sns.set_theme(style = 'ticks', font_scale = 1.2, palette = 'colorblind')
-mpl.rcParams['font.family'] = 'Arial'
+mpl.rcParams['font.family'] = 'sans-serif'
 
 # region: factor downstream analyses
 def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
@@ -416,7 +416,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             ax1.set_xlabel('Number of components (k)', fontsize = 14)
             lines = ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
             ax1.legend(lines[:3], ['Prediction error','Silhouette score','PCA variance ratio'], loc = 'upper center', frameon = False,
-                bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5)
+                bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5, fontsize = 12)
 
             sns.histplot(local_density.values, ax = ax_density, binwidth = 0.02, color = '#6a3d9a')
             bin_counts = np.histogram(local_density.values, bins = np.arange(0, 1.05, 0.02))[0]
@@ -428,7 +428,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             ax_density.tick_params(axis = 'y', left = False, labelleft = False, right = True, labelright = True)
             ax_density.tick_params(axis = 'x', bottom = True, labelbottom = True)
             ax_density.set_ylabel('')
-            ax_density.set_xlabel('Mean distance to\n 30% nearest neughbours', fontsize = 14)
+            ax_density.set_xlabel('Mean distance to 30%\nnearest neughbours', fontsize = 14)
             ax_density.axvline(x = density_threshold, c = '0.6', linestyle = '--', linewidth = 2)
             n_total = len(local_density); n_removed = (local_density > density_threshold).sum()
             ax_density.text(0.55, 0.8, f'{n_removed}/{n_total} ({n_removed/n_total:.1%})\nspectra removed', 
