@@ -431,11 +431,11 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             ax_density.text(0.55, 0.8, f'{n_removed}/{n_total} ({n_removed/n_total:.1%})\nspectra removed', 
                 transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center')
             fig.savefig(f'{cnmf_plot_prefix}.pdf', bbox_inches = 'tight')
+            plt.close(fig)
             log.log(f'cNMF k-selection and local density plots saved to {cnmf_plot_prefix}.pdf', calling_file = 'run_cnmf')
         except:
             log.warn('Failed to generate the joint local density / k selection plot. Check for missing files', calling_file = 'run_cnmf')
             log.warn('Ignore this warning if specifying a specific k value without trying a range of k values', calling_file = 'run_cnmf')
-            raise
 
     # consensus factor decomposition
     log.log(f'Conducting consensus factor decomposition with k = {k_optim} and density threshold = {density_threshold}', calling_file = 'run_cnmf')
