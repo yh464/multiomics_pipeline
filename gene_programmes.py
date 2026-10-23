@@ -376,69 +376,70 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
             k_selection_stats = pd.DataFrame(**file)
         k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
         log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
+
+        # publication-quality PDF incorporating scree plot and local density histogram
+        if not os.path.isfile(f'{cnmf_plot_prefix}.pdf') or force:
+            try:
+                with np.load(cnmf_obj.paths['local_density_cache'].replace('%d', str(k_optim)), allow_pickle = True) as file:
+                    local_density = pd.DataFrame(**file).iloc[:,0]
+                k_selection_stats.k = k_selection_stats.k.astype(int)
+
+                # merge with PCA
+                pca_df = pd.DataFrame({'k': np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), 'pca_var_ratio': adata.uns['pca']['variance_ratio']})
+                pca_df = pca_df.loc[pca_df.k <= k_selection_stats.k.max(), :]
+                k_selection_stats = pd.merge(k_selection_stats, pca_df, on='k', how = 'outer')
+
+                fig, ax = plt.subplots(1,2, figsize = (8, 2), width_ratios = (5,3))
+                ax1 = ax[0]; ax2 = ax1.twinx(); ax3 = ax1.twinx(); ax_density = ax[1]
+                for plot_ax, stat, label, colour, style in zip(
+                    [ax1, ax2, ax3],
+                    ['prediction_error','silhouette','pca_var_ratio'],
+                    ['Prediction error','Silhouette score','PCA variance ratio'],
+                    ['#1f78b4','#33a02c','#000000'],
+                    ['--', '-', '-.']
+                ):
+                    plot_ax.plot(k_selection_stats.k, k_selection_stats[stat], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
+                    plot_ax.spines[['top', 'right', 'bottom']].set_visible(False)
+                    plot_ax.set_xticks(np.arange(min(n_components), max(n_components)+1, 5))
+                    plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
+                    plot_ax.yaxis.set_label_position('left')
+                    plot_ax.yaxis.tick_left()
+                    plot_ax.spines['left'].set_color(colour)
+                    plot_ax.tick_params(axis = 'y', colors = colour)
+                    plot_ax.set_ylabel('')
+                ax1.grid(True, 'both','x')
+                ax2.spines['left'].set_position(('outward', 40))
+                ax3.spines['left'].set_position(('outward', 80))
+                ax1.set_xlabel('Number of components (k)', fontsize = 14)
+                lines = ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
+                ax1.legend(lines[:3], ['Prediction error','Silhouette score','PCA variance ratio'], loc = 'upper center', frameon = False,
+                    bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5, fontsize = 12)
+
+                sns.histplot(local_density.values, ax = ax_density, binwidth = 0.02, color = '#6a3d9a')
+                bin_counts = np.histogram(local_density.values, bins = np.arange(0, 1.05, 0.02))[0]
+                bin_counts_sorted = np.sort(bin_counts)[::-1]
+                ax_density.set_xlim(0, 1.05)
+                ax_density.set_ylim(0, min(2*bin_counts_sorted[1], bin_counts_sorted[0]+1))
+                ax_density.text(0, 1.02, f'{bin_counts[0]}', transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center', color = '#6a3d9a')
+                ax_density.spines[['top', 'left']].set_visible(False)
+                ax_density.tick_params(axis = 'y', left = False, labelleft = False, right = True, labelright = True)
+                ax_density.tick_params(axis = 'x', bottom = True, labelbottom = True)
+                ax_density.set_ylabel('')
+                ax_density.set_xlabel('Mean distance to 30%\nnearest neughbours', fontsize = 14)
+                ax_density.axvline(x = density_threshold, c = '0.6', linestyle = '--', linewidth = 2)
+                n_total = len(local_density); n_removed = (local_density > density_threshold).sum()
+                ax_density.text(0.55, 0.8, f'{n_removed}/{n_total} ({n_removed/n_total:.1%})\nspectra removed', 
+                    transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center')
+                fig.savefig(f'{cnmf_plot_prefix}.pdf', bbox_inches = 'tight')
+                plt.close(fig)
+                log.log(f'cNMF k-selection and local density plots saved to {cnmf_plot_prefix}.pdf', calling_file = 'run_cnmf')
+            except:
+                log.warn('Failed to generate the joint local density / k selection plot. Check for missing files', calling_file = 'run_cnmf')
+                log.warn('Ignore this warning if specifying a specific k value without trying a range of k values', calling_file = 'run_cnmf')
+
     else: 
         k_optim = n_components[0]
         log.log(f'Proceeding with k = {k_optim} for downstream analysis', calling_file = 'run_cnmf')
-
-    # publication-quality PDF incorporating scree plot and local density histogram
-    if not os.path.isfile(f'{cnmf_plot_prefix}.pdf') or force:
-        try:
-            with np.load(cnmf_obj.paths['local_density_cache'].replace('%d', str(k_optim)), allow_pickle = True) as file:
-                local_density = pd.DataFrame(**file).iloc[:,0]
-            k_selection_stats.k = k_selection_stats.k.astype(int)
-
-            # merge with PCA
-            pca_df = pd.DataFrame({'k': np.arange(1, len(adata.uns['pca']['variance_ratio'])+1), 'pca_var_ratio': adata.uns['pca']['variance_ratio']})
-            pca_df = pca_df.loc[pca_df.k <= k_selection_stats.k.max(), :]
-            k_selection_stats = pd.merge(k_selection_stats, pca_df, on='k', how = 'outer')
-
-            fig, ax = plt.subplots(1,2, figsize = (8, 2), width_ratios = (5,3))
-            ax1 = ax[0]; ax2 = ax1.twinx(); ax3 = ax1.twinx(); ax_density = ax[1]
-            for plot_ax, stat, label, colour, style in zip(
-                [ax1, ax2, ax3],
-                ['prediction_error','silhouette','pca_var_ratio'],
-                ['Prediction error','Silhouette score','PCA variance ratio'],
-                ['#1f78b4','#33a02c','#000000'],
-                ['--', '-', '-.']
-            ):
-                plot_ax.plot(k_selection_stats.k, k_selection_stats[stat], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
-                plot_ax.spines[['top', 'right', 'bottom']].set_visible(False)
-                plot_ax.set_xticks(np.arange(min(n_components), max(n_components)+1, 5))
-                plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
-                plot_ax.yaxis.set_label_position('left')
-                plot_ax.yaxis.tick_left()
-                plot_ax.spines['left'].set_color(colour)
-                plot_ax.tick_params(axis = 'y', colors = colour)
-                plot_ax.set_ylabel('')
-            ax1.grid(True, 'both','x')
-            ax2.spines['left'].set_position(('outward', 40))
-            ax3.spines['left'].set_position(('outward', 80))
-            ax1.set_xlabel('Number of components (k)', fontsize = 14)
-            lines = ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
-            ax1.legend(lines[:3], ['Prediction error','Silhouette score','PCA variance ratio'], loc = 'upper center', frameon = False,
-                bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5, fontsize = 12)
-
-            sns.histplot(local_density.values, ax = ax_density, binwidth = 0.02, color = '#6a3d9a')
-            bin_counts = np.histogram(local_density.values, bins = np.arange(0, 1.05, 0.02))[0]
-            bin_counts_sorted = np.sort(bin_counts)[::-1]
-            ax_density.set_xlim(0, 1.05)
-            ax_density.set_ylim(0, min(2*bin_counts_sorted[1], bin_counts_sorted[0]+1))
-            ax_density.text(0, 1.02, f'{bin_counts[0]}', transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center', color = '#6a3d9a')
-            ax_density.spines[['top', 'left']].set_visible(False)
-            ax_density.tick_params(axis = 'y', left = False, labelleft = False, right = True, labelright = True)
-            ax_density.tick_params(axis = 'x', bottom = True, labelbottom = True)
-            ax_density.set_ylabel('')
-            ax_density.set_xlabel('Mean distance to 30%\nnearest neughbours', fontsize = 14)
-            ax_density.axvline(x = density_threshold, c = '0.6', linestyle = '--', linewidth = 2)
-            n_total = len(local_density); n_removed = (local_density > density_threshold).sum()
-            ax_density.text(0.55, 0.8, f'{n_removed}/{n_total} ({n_removed/n_total:.1%})\nspectra removed', 
-                transform = ax_density.transAxes, fontsize = 12, horizontalalignment = 'center')
-            fig.savefig(f'{cnmf_plot_prefix}.pdf', bbox_inches = 'tight')
-            plt.close(fig)
-            log.log(f'cNMF k-selection and local density plots saved to {cnmf_plot_prefix}.pdf', calling_file = 'run_cnmf')
-        except:
-            log.warn('Failed to generate the joint local density / k selection plot. Check for missing files', calling_file = 'run_cnmf')
-            log.warn('Ignore this warning if specifying a specific k value without trying a range of k values', calling_file = 'run_cnmf')
 
     # consensus factor decomposition
     log.log(f'Conducting consensus factor decomposition with k = {k_optim} and density threshold = {density_threshold}', calling_file = 'run_cnmf')
