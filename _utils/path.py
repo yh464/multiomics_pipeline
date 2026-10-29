@@ -9,7 +9,7 @@ Correspondence: yh464@cam.ac.uk
 This utility manages the nomenclature of file names / paths
 '''
 
-import os, re, json
+import os, re, json, glob
 from fnmatch import fnmatch
 import numpy as np
 import pandas as pd
@@ -99,7 +99,7 @@ class project():
         self.progress = out_df
         return out_df
 
-    def find_h5ad(self, *datasets, normalised = False, long = True, exclude = []):
+    def find_h5ad(self, *datasets, normalised = False, long = True, exclude = [], atac = False):
         out = []
         if len(datasets) == 0: return []
         if type(datasets[0]) in [list, tuple]:
@@ -119,6 +119,7 @@ class project():
                     if fnmatch(pdir,'*'+y.split('/')[0]+'*') and fnmatch(x, '*'+y.split('/')[1]+'*'):
                         exc = True; break
                 if exc: continue
+                if atac and x.find('atac') < 0: continue
                 xlist.append(x.replace('.h5ad','').replace('.gz',''))
             if len(out) == 0 or pdir != out[-1][0]: out.append((pdir, xlist))
             else: out[-1] = (pdir, sorted(out[-1][1] + xlist))

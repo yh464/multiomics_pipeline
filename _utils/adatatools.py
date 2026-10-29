@@ -15,11 +15,22 @@ log = logger()
 import scanpy as sc
 import anndata as ad
 
-# quality control functions
+# data check functions
 def check_spatial(dataset = None, prefix = None, spatial_key = 'spatial', adata = None):
     if (close := adata is None): adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
     if not (out := spatial_key in adata.obsm.keys()):
         log.warn(f'Spatial key {spatial_key} not found, please check your input dataset')
+    if close: adata.file.close()
+    return out
+
+def check_atac(dataset = None, prefix = None, adata = None):
+    if (close := adata is None): adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+    not_chr_filter = adata.var_names[~adata.var_names.str.lower().str.startswith('chr')]
+    if not (out := len(not_chr_filter) > 0):
+        log.warn(f'Input dataset seems to be an RNA-seq dataset. Invalid ATAC peak names found:')
+        for i, x in enumerate(not_chr_filter): 
+            log.warn(f'    {x}')
+            if i > 10: break
     if close: adata.file.close()
     return out
 

@@ -374,8 +374,26 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
         with np.load(cnmf_obj.paths['k_selection_stats'], allow_pickle = True) as file:
             k_selection_stats = pd.DataFrame(**file)
-        k_optim = k_selection_stats.k.astype(int)[k_selection_stats.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
+
+        # determine the elbow point based on the PCA variance ratio using the 'knee' method
+        # i.e, furthest distance from the line connecting the first and last points on the scree plot (1, var1) and (len(pca_var_ratio), var_last)
+        pca_var_ratio = adata.uns['pca']['variance_ratio']
+        x = np.arange(1, len(pca_var_ratio) + 1)
+        y = pca_var_ratio
+        # Calculate the Euclidean distance from each point to the line passing through (1, y[0]) and (len(pca_var_ratio), y[-1])
+        line_vec = np.array([len(pca_var_ratio) - 1, y[-1] - y[0]]).astype(float)
+        line_vec /= np.linalg.norm(line_vec)
+        point_vecs = np.column_stack((x - 1, y - y[0]))
+        distances = np.abs(np.cross(point_vecs, line_vec)) / np.linalg.norm(line_vec)
+        # Find the index of the point with the maximum distance
+        k_elbow = np.argmax(distances) + 1
+
+        # k_optim should be at least k_elbow and then maximise based on silhouette score
+        k_selection_stats_tmp = k_selection_stats_tmp.loc[k_selection_stats.k >= k_elbow, :]
+        k_optim = k_selection_stats_tmp.k.astype(int)[k_selection_stats_tmp.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
+        log.log(f'Optimal number of PCs based on elbow method: {k_elbow}', calling_file = 'run_cnmf')
         log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
+        del x, y, line, distances, k_elbow, k_selection_stats_tmp
 
         # publication-quality PDF incorporating scree plot and local density histogram
         if not os.path.isfile(f'{cnmf_plot_prefix}.pdf') or force:
