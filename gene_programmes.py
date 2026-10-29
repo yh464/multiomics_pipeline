@@ -389,7 +389,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         k_elbow = np.argmax(distances) + 1
 
         # k_optim should be at least k_elbow and then maximise based on silhouette score
-        k_selection_stats_tmp = k_selection_stats_tmp.loc[k_selection_stats.k >= k_elbow, :]
+        k_selection_stats_tmp = k_selection_stats.loc[k_selection_stats.k >= k_elbow, :]
         k_optim = k_selection_stats_tmp.k.astype(int)[k_selection_stats_tmp.silhouette.argmax()] # NEED TO DOUBLE CHECK ON THE PLOTS, ONLY A GUIDE
         log.log(f'Optimal number of PCs based on elbow method: {k_elbow}', calling_file = 'run_cnmf')
         log.log(f'Optimal number of components identified: {k_optim}', calling_file = 'run_cnmf')
