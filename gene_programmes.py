@@ -451,7 +451,9 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
                 fig.savefig(f'{cnmf_plot_prefix}.pdf', bbox_inches = 'tight')
                 plt.close(fig)
                 log.log(f'cNMF k-selection and local density plots saved to {cnmf_plot_prefix}.pdf', calling_file = 'run_cnmf')
-            except:
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
                 log.warn('Failed to generate the joint local density / k selection plot. Check for missing files', calling_file = 'run_cnmf')
                 log.warn('Ignore this warning if specifying a specific k value without trying a range of k values', calling_file = 'run_cnmf')
 
