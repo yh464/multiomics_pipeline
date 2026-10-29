@@ -14,6 +14,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from .aes import register_palettes, discrete_palette
+mpl.rcParams['font.family'] = 'Arial'
 
 def _add_rep_axis(fig, rep = 'UMAP'):
   # UMAP axes

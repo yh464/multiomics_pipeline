@@ -19,6 +19,7 @@ from .aes import redblue
 from .tidy import capitalise, get_fdr
 try: mpl.colormaps.register(redblue)
 except: pass 
+mpl.rcParams['font.family'] = 'Arial'
 
 def corr_heatmap(summary, sort = True, absmax = None, autocor = False, annot = '', p_threshold: list[float] = [],
     sig_col = None, xlabel = True, ylabel = True):

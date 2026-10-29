@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.stats import median_abs_deviation as mad
 from .aes import discrete_palette_n, redblue
+mpl.rcParams['font.family'] = 'Arial'
 
 def _disjoint_groups(df):
     '''

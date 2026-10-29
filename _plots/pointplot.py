@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from .tidy import capitalise, get_fdr
 from .aes import discrete_palette
+mpl.rcParams['font.family'] = 'Arial'
 
 def summary_pointplot(summary, xgroup = None, x = None, hue = None, y = None, se = None, 
     sort = False, p_threshold: list[float] = [], sig_col = None, xlabel = True, ylabel = None,
