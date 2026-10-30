@@ -123,12 +123,13 @@ def scatterplot_adata(adata, v, rep = 'umap', **kwargs):
   
   if isinstance(v, str) and v in adata.obs.columns.tolist():
     val = adata.obs[v]; vname = v
-  elif isinstance(v, str) and v in adata.var.index.tolist():
+  elif isinstance(v, str) and v in adata.var_names.tolist():
     gene_idx = adata.var.index.get_loc(v)
     val = adata.X[:,gene_idx].toarray().flatten() if hasattr(adata.X, 'toarray') else adata.X[:,gene_idx].flatten()
+    assert len(val) == len(x), 'Check that the name of the gene is unique'
     vname = v
   else:
-    val = v; vname = ''
+    val = v; vname = kwargs['vname'] if 'vname' in kwargs else ''
   
   fig = scatterplot_noaxis(x, y, val, rep = rep_axis, vname = vname, **kwargs)
   return fig
