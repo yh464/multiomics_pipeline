@@ -35,6 +35,9 @@ def scatterplot_noaxis(x, y, v, *, full = True, palette = None, s = 'auto', rep 
     s: point size
     all **kwargs are passed to sns.scatterplot()
   '''
+  if isinstance(x, pd.Series): x = x.values
+  if isinstance(y, pd.Series): y = y.values
+  if isinstance(v, pd.Series): v = v.values
   df = pd.DataFrame(dict(x = x, y = y, v = v)).dropna()
   if not full and df.shape[0] > 500000: df = df.sample(500000, random_state = 0) # for large datasets, sample points to speed up plotting
 
