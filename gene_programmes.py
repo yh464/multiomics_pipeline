@@ -133,6 +133,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
     if not out_fig.endswith('.png') and not out_fig.endswith('.pdf'): out_fig += '.pdf'
     scores.columns = [f'F{i+1}' for i in range(scores.shape[1])]
+    scores.index = scores.index.astype(str)
     vmax = max(np.nanquantile(np.abs(scores.values), 0.95)*1.5,np.nanmax(np.abs(scores.values)))
     score_cols = scores.columns.tolist()
     for emb_key in embedding_key:
