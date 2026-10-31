@@ -78,7 +78,7 @@ def factor_importance(scores, adata, factors_to_explain, out_tabular, out_fig):
                     id_vars = 'cell_type', var_name = 'scired_factor', value_name = 'sd_score')
                 fcat_col = fcat_col.merge(cell_type_mean).merge(cell_type_sd).rename(columns={'scired_factor': 'factor'})
                 fcat_col.to_csv(out_tabular.replace('$celltype', col), sep = '\t', index = False, header = True)
-            else: fcat_col = pd.read_table(out_tabular.replace('$celltype', col), index_col = 0)
+            else: fcat_col = pd.read_table(out_tabular.replace('$celltype', col))
             fig = corr_heatmap(fcat_col, sort = False, sig_col = 'significance')
             fig.savefig(out_fig.replace('$celltype', col), bbox_inches = 'tight')
             plt.close(fig)
