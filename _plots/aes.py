@@ -9,9 +9,9 @@ Plotting aesthetics
 
 import matplotlib as mpl
 import seaborn as sns
-import math
+import numpy as np
 
-# colour palettes
+# region colour palettes
 def register_palettes(*palettes):
   for p in palettes:
     try: mpl.colormaps.register(p)
@@ -59,6 +59,16 @@ redgrey_alpha = mpl.colors.LinearSegmentedColormap(
   1024
   )
 
+redgrey_alpha0 = mpl.colors.LinearSegmentedColormap(
+  'redgrey_alpha0',
+  dict(red = ((0,0.8,0.8),(1,0.8,0.8)),
+       green = ((0,0.8,0.8),(1,0,0)),
+       blue = ((0,0.8,0.8),(1,0,0)),
+       alpha = ((0,0,0),(1,1,1))),
+  1024
+  )
+
+
 whiteblue = mpl.colors.LinearSegmentedColormap(
   'whiteblue',
   dict(red = ((0,0,0),(1,1,1)),
@@ -84,15 +94,32 @@ greyblue_alpha = mpl.colors.LinearSegmentedColormap(
   1024,
 )
 
-def discrete_palette(n):
+greyblue_alpha0 = mpl.colors.LinearSegmentedColormap(
+  'greyblue_alpha0',
+  dict(red = ((0,0,0),(1,.8,.8)),
+       green = ((0,0,0),(1,.8,.8)),
+       blue = ((0,0.8,0.8),(1,.8,.8)),
+       alpha = ((0,1,1),(1,0,0))),
+  1024,
+)
+
+def discrete_palette_n(n):
   '''Default colour palette to use for discrete mapping'''
-  if n <= 10: return sns.color_palette('muted', n)
+  if n <= 10: return sns.color_palette('Set2', n)
   else:
     palette = sns.color_palette('husl', n) # reorder to maximise distance between adjacent colours
-    split_half = math.ceil(n / 2)
+    split_half = int(np.ceil(n / 2))
     out = []
     for i in range(split_half):
       out.append(palette[i])
       if i + split_half < n:
         out.append(palette[i + split_half])
     return out
+
+def discrete_palette(categories):
+  '''Default colour palette to use for discrete mapping
+  returns a dict mapping from category to colour'''
+  palette = discrete_palette_n(len(categories))
+  return dict(zip(categories, palette))
+
+# endregion
