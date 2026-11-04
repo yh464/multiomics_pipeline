@@ -16,7 +16,7 @@ proj = project()
 from _utils.slurm import array_submitter, add_slurm_args_dec
 from gene_programmes import check_cnmf_incomplete, add_cmd_args
 add_cmd_args = add_slurm_args_dec(add_cmd_args)
-from _utils.adatatools import get_metadata_cols
+from _utils.adatatools import select_metadata_cols
 
 def main(args):
     cnmf_prep_submitter = array_submitter(name = 'cnmf_prep_' + '_'.join(args.datasets),
@@ -42,16 +42,16 @@ def main(args):
 
     for dataset, prefix in h5ad:
         # if cell type is set as default
-        if args.cell_type == ['cell_type']: selected_cell_types = get_metadata_cols(dataset, prefix, args.cell_type)
+        if args.cell_type == ['cell_type']: selected_cell_types = select_metadata_cols(dataset, prefix, args.cell_type)
         else: selected_cell_types = args.cell_type
-        if args.time_key == ['pseudotime', 'age', 'time']: selected_time_keys = get_metadata_cols(dataset, prefix, args.time_key, input_string = 'time-related variable')
+        if args.time_key == ['pseudotime', 'age', 'time']: selected_time_keys = select_metadata_cols(dataset, prefix, args.time_key, input_string = 'time-related variable')
         else: selected_time_keys = args.time_key
 
         cmd = f'python gene_programmes.py {dataset} {prefix} --cnmf_components {cnmf_components_str} --cnmf_dt {args.cnmf_dt} '+ \
             f'--scired_components {args.scired_components} --scired_genes {args.scired_genes} --scired_covars {" ".join(args.scired_covars)} '+ \
             f'--cell_type {" ".join(selected_cell_types)} --time_key {" ".join(selected_time_keys)} --embedding {" ".join(args.embedding)}'
         if len(args.projection) > 0: cmd += ' --project ' + ' '.join(args.projection)
-        for key in ['force', 'spectra', 'magma', 'project_only']:
+        for key in ['force', 'magma', 'project_only']:
             if getattr(args, key): cmd += f' --{key}'
         if args.magma: cmd += f' --magma_out {args.magma_out} --magma'
         if args.cnmf:
@@ -64,6 +64,8 @@ def main(args):
             # if the preprocessing step is not complete, submit a separate job with higher memory just to preprocess files
             if norm_counts_incomplete: cnmf_prep_submitter.add(cmd + ' --cnmf --worker -1')
             for worker_id in range(n_jobs): cnmf_submitter.add(cmd + f' --cnmf --worker {worker_id}')
+        if args.scired: scired_submitter.add(cmd + ' --scired')
+        if args.spectra: spectra_submitter.add(cmd + ' --spectra')
     cnmf_submitter.submit()
     scired_submitter.submit()
     spectra_submitter.submit()

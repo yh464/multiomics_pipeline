@@ -16,7 +16,7 @@ from _utils.path import project
 proj = project()
 from _utils.logger import logger
 log = logger()
-from _utils.adatatools import get_metadata_cols, get_embedding_keys
+from _utils.adatatools import select_metadata_cols, select_embedding_keys
 from tqdm import tqdm
 
 def main(args):
@@ -26,11 +26,11 @@ def main(args):
         adata = sc.read_h5ad(h5ad_raw, 'r')
         args.cell_type = [x for x in args.cell_type if x in adata.obs.columns]
         args.embedding = [x for x in args.embedding if x in adata.obsm.keys()]
-        if args.cell_type in [['cell_type'], []]: selected_cell_types = get_metadata_cols(adata = adata, default = args.cell_type)
+        if args.cell_type in [['cell_type'], []]: selected_cell_types = select_metadata_cols(adata = adata, default = args.cell_type)
         else: selected_cell_types = args.cell_type
         if all([x in adata.obsm.keys() for x in args.embedding]):
             selected_embeddings = args.embedding
-        else: selected_embeddings = get_embedding_keys(adata = adata, default = args.embedding)
+        else: selected_embeddings = select_embedding_keys(adata = adata, default = args.embedding)
         for cell_type_col in tqdm(selected_cell_types, desc = f'Processing {dataset}/{prefix}'):
             out_fig = f'{args.out}/{dataset}_{prefix}_{cell_type_col}_legend.png' if prefix.find(dataset) == -1 else \
                 f'{args.out}/{prefix}_{cell_type_col}_legend.png'
