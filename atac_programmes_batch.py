@@ -42,7 +42,7 @@ def main(args):
         flags = []
         for key in ['cistopic_components', 'cistopic_alpha', 'cistopic_eta', 'mallet', 'scopen_components', 'downsample', 'niter']:
             flags.append(f'--{key}')
-            if isinstance(getattr(args, key), list): flags.extend([str(x) for x in getattr(args, key)])
+            if type(getattr(args, key)) in [list, range, tuple]: flags.extend([str(x) for x in getattr(args, key)])
             else: flags.append(str(getattr(args, key)))
         flags.extend(['--cell_type'] + selected_cell_types + ['--time_key'] + selected_time_keys + ['--embedding'] + args.embedding)
         if getattr(args, 'force'): flags.append('--force')
