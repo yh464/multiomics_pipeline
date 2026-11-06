@@ -179,10 +179,6 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25),):
 
 @log.profile
 def main(args):
-    projection = proj.find_h5ad(args.projection, long = True)
-    if len(projection) > 1: 
-        projection = []
-        log.warn('Multiple datasets found for projection, ignoring --project argument')
     cistopic_outdir = os.path.dirname(proj.to_pathname('atac_programmes_cistopic', args.dataset, args.prefix))
     scopen_outdir = os.path.dirname(proj.to_pathname('atac_programmes_scopen', args.dataset, args.prefix))
     if args.cistopic:
