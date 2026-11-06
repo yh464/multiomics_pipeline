@@ -233,9 +233,9 @@ if __name__ == '__main__':
     parser.add_argument('--worker', type = int, default = 0, help = 'Worker ID for parallel processing (default: 0)')
     parser = add_cmd_args(parser)
     args = parser.parse_args()
-    if len(args.cnmf_components) == 3: 
-        args.cnmf_components = range(args.cnmf_components[0], args.cnmf_components[1]+1, args.cnmf_components[2])
-    elif len(args.cnmf_components) == 1: args.cnmf_components = [args.cnmf_components[0]]
-    else: log.error('Invalid format for --cnmf_components, please provide either a single integer or three integers for start, stop, step')
+    if len(args.cistopic_components) == 3: 
+        args.cistopic_components = range(args.cistopic_components[0], args.cistopic_components[1]+1, args.cistopic_components[2])
+    elif len(args.cistopic_components) == 1: args.cistopic_components = [args.cistopic_components[0]]
+    else: log.error('Invalid format for --cistopic_components, please provide either a single integer or three integers for start, stop, step')
     log.splash(args)
     main(args)

@@ -51,7 +51,9 @@ def main(args):
         cmd = f'python gene_programmes.py {dataset} {prefix} '+ ' '.join(flags)
 
         if args.cistopic: 
-            for i in (incomplete := check_cistopic_complete(dataset, prefix, n_components = args.cistopic_components)): 
+            for i in (incomplete := check_cistopic_complete(dataset, prefix, 
+                n_components = range(args.cistopic_components[0], args.cistopic_components[1]+1, args.cistopic_components[2])
+                ) if len(args.cistopic_components) == 3 else [args.cistopic_components]):
                 cistopic_submitter.add(cmd + f' --cistopic --worker {i}')
             if len(incomplete) == 0:
                 cistopic_submitter.add(cmd + f' --cistopic --worker 0')

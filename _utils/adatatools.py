@@ -87,14 +87,14 @@ def check_atac(dataset = None, prefix = None, adata = None):
         try:
             new_start = lo.convert_coordinate(chrom, start)
             new_end = lo.convert_coordinate(chrom, end)
-            if len(new_start) > 0 and len(new_end) > 0:
-                coords[lift_to]['start'].append(new_start[0][1])
-                coords[lift_to]['end'].append(new_end[0][1])
-            else: raise ValueError(f'No lift over result for {chrom}:{start}-{end}')
+            if len(new_start) == 0 or len(new_end) == 0: raise ValueError(f'No lift over result for {chrom}:{start}-{end}')
+            if new_start[0][0] != new_end[0][0]: raise ValueError(f'Lift over result for {chrom}:{start}-{end} is on different chromosomes: {new_start[0][0]} vs {new_end[0][0]}')
+            coords[lift_to]['start'].append(new_start[0][1])
+            coords[lift_to]['end'].append(new_end[0][1])
         except Exception as e:
             log.warn(f'Error lifting over {chrom}:{start}-{end}: {e}', calling_file = 'check_atac')
-            coords[lift_to]['start'].append(np.nan)
-            coords[lift_to]['end'].append(np.nan)
+            coords[lift_to]['start'].append(-1)
+            coords[lift_to]['end'].append(-1)
 
     coords[lift_to]['start'] = pd.Series(coords[lift_to]['start'])
     coords[lift_to]['end'] = pd.Series(coords[lift_to]['end'])
