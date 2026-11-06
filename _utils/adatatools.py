@@ -16,6 +16,14 @@ proj = project()
 from _utils.logger import logger
 log = logger()
 
+# accessing data using h5py
+def h5py_get_col(col_connection):
+    if isinstance(col_connection, h5py._hl.group.Group): # as categorical, contains 'categories' and 'codes'
+        col = pd.Series(col_connection['categories'][:][col_connection['codes'][:]].astype(str))
+    else:
+        col = pd.Series(col_connection[:].astype(str))
+    return col
+
 # data check functions
 def check_spatial(dataset = None, prefix = None, spatial_key = 'spatial', adata = None):
     if adata is None:
@@ -63,14 +71,11 @@ def check_atac(dataset = None, prefix = None, adata = None):
         coords[genome_build]['end'] = adata.var[end_col].astype(int)
     else:
         with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
-            if isinstance(file['var'][chrom_col], h5py._hl.group.Group): # as categorical, contains 'categories' and 'codes'
-                chrom = pd.Series(file['var'][chrom_col]['categories'][:][file['var'][chrom_col]['codes'][:]].astype(str))
-            else:
-                chrom = file['var'][chrom_col][:].astype(str)
+            chrom = h5py_get_col(file['var'][chrom_col])
             coords[genome_build]['chrom'] = 'chr' + pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
                 {'23': 'X', '24': 'Y', '25': 'XY', '26': 'M', 'MT': 'M'})
-            coords[genome_build]['start'] = pd.Series(file['var'][start_col][:].astype(int))
-            coords[genome_build]['end'] = pd.Series(file['var'][end_col][:].astype(int))
+            coords[genome_build]['start'] = h5py_get_col(file['var'][start_col]).astype(int)
+            coords[genome_build]['end'] = h5py_get_col(file['var'][end_col]).astype(int)
 
     coords[lift_to] = dict(chrom = coords[genome_build]['chrom'], start = [], end = [])
 
