@@ -62,8 +62,12 @@ def check_atac(dataset = None, prefix = None, adata = None):
         coords[genome_build]['end'] = adata.var[end_col].astype(int)
     else:
         with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
-            coords[genome_build]['chrom'] = 'chr' + pd.Series(file['var'][chrom_col][:].astype(str)).str.replace('chr', '', regex = False).str.strip().replace(
-                {'23': 'X', '24': 'Y', '25': 'M', '26': 'M', 'MT': 'M'})
+            if isinstance(file['var'][chrom_col], h5py._hl.group.Group): # as categorical, contains 'categories' and 'codes'
+                chrom = pd.Series(file['var'][chrom_col]['categories'][:][file['var'][chrom_col]['codes'][:]].astype(str))
+            else:
+                chrom = file['var'][chrom_col][:].astype(str)
+            coords[genome_build]['chrom'] = 'chr' + pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
+                {'23': 'X', '24': 'Y', '25': 'XY', '26': 'M', 'MT': 'M'})
             coords[genome_build]['start'] = pd.Series(file['var'][start_col][:].astype(int))
             coords[genome_build]['end'] = pd.Series(file['var'][end_col][:].astype(int))
 
@@ -125,7 +129,8 @@ def select_metadata_cols(dataset = None, prefix = None, default = [], input_stri
         with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
             columns = list(file['obs'].keys()) if axis == 'obs' else list(file['var'].keys())
     else: columns = adata.obs.columns if axis == 'obs' else adata.var.columns
-    default = [x for x in default if x in columns]
+    default = [x.lower() for x in default]
+    default = [x for x in columns if x.lower() in default]
     # take keyboard input to select cell type columns
     log.log('Following columns are found:')
     for i, col in enumerate(columns):
@@ -144,7 +149,8 @@ def select_embedding_keys(dataset = None, prefix = None, default = [], adata = N
         with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
             keys = list(file['obsm'].keys())
     else: keys = adata.obsm.keys()
-    default = [x for x in default if x in keys]
+    default = [x.lower() for x in default]
+    default = [x for x in keys if x.lower() in default]
     log.log('Following embeddings are found:')
     for i, key in enumerate(keys):
         log.log(f'    {i}: {key}')
