@@ -48,7 +48,7 @@ def main(args):
         if getattr(args, 'force'): flags.append('--force')
         if getattr(args, 'magma'): flags.extend(['--magma', '--magma_out', args.magma_out])
 
-        cmd = f'python gene_programmes.py {dataset} {prefix} '+ ' '.join(flags)
+        cmd = f'python atac_programmes.py {dataset} {prefix} '+ ' '.join(flags)
 
         if args.cistopic: 
             for i in (incomplete := check_cistopic_complete(dataset, prefix, 
