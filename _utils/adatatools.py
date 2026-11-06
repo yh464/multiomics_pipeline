@@ -51,6 +51,7 @@ def check_atac(dataset = None, prefix = None, adata = None):
     genome_build = input('Enter genome build (hg19 or hg38): (Default: hg38)').strip()
     while genome_build not in ['hg19', 'hg38', '']:
         genome_build = input('Invalid genome build, please enter hg19 or hg38: ').strip()
+    genome_build = genome_build or 'hg38'
     lift_to = 'hg38' if genome_build == 'hg19' else 'hg19'
 
     # load chromosome, start and end coordinates from adata or h5ad file
@@ -127,7 +128,8 @@ def select_metadata_cols(dataset = None, prefix = None, default = [], input_stri
     assert axis in ['obs', 'var'], 'axis must be either obs or var'
     if adata is None:
         with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
-            columns = list(file['obs'].keys()) if axis == 'obs' else list(file['var'].keys())
+            if 'column-order' in file[axis].attrs.keys(): columns = list(file[axis].attrs['column-order'])
+            else: columns = list(file[axis].keys())
     else: columns = adata.obs.columns if axis == 'obs' else adata.var.columns
     default = [x.lower() for x in default]
     default = [x for x in columns if x.lower() in default]
