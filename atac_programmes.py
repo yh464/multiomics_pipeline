@@ -54,11 +54,17 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     os.makedirs(f'{outdir}/temp', exist_ok = True)
 
     # automatically downsample to 10000 cells per cell type if downsample is set to -1 and multiple n_component values are used
-    if downsample == -1 and len(n_components) > 1: downsample = 10000
+    if downsample == -1 and len(n_components) > 1: 
+        log.log(f'Automatically downsampling to 10000 cells per cell type for {dataset} {prefix} since multiple n_components are used', calling_file = 'run_cistopic')
+        downsample = 10000
 
     if downsample > 0:
         adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
-        selected_cells = adata.obs.groupby(cell_type).sample(n = downsample, replace = False, random_state = seed)
+        # print number of cells per cell type
+        log.log(f'Number of cells per cell type for {dataset} {prefix}:', calling_file = 'run_cistopic')
+        for cell_type_name in adata.obs.groupby(cell_type[0]).size().index:
+            log.log(f'  {cell_type_name}: {adata.obs[adata.obs[cell_type[0]] == cell_type_name].shape[0]}', calling_file = 'run_cistopic')
+        selected_cells = adata.obs.groupby(cell_type[0]).sample(n = downsample, replace = False, random_state = seed)
         adata = adata[selected_cells.index, :].to_memory()
     else: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix))
 
