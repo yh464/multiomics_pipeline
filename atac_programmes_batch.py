@@ -20,15 +20,13 @@ from _utils.adatatools import select_metadata_cols, check_atac
 
 def main(args):
     cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720)
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic')
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cistopic_outdir = 'programmes/cistopic/$dataset/$prefix'
     proj.register('atac_programmes_cistopic',f'{cistopic_outdir}/$prefix.cistopic.k_$k.topic_loadings.txt.gz')
-    cistopic_components_str = ' '.join([str(x) for x in args.cistopic_components])
     scopen_outdir = 'programmes/scopen/$dataset/$prefix'
     proj.register('atac_programmes_scopen',f'{scopen_outdir}/$prefix.scopen.k_$k.dt_$dt.consensus.txt')
-    scopen_components_str = ' '.join([str(x) for x in args.scopen_components])
 
     for dataset, prefix in h5ad:
         if not check_atac(dataset, prefix): continue
