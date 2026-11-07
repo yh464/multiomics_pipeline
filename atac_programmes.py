@@ -47,7 +47,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
 
     import scanpy as sc
     import pickle
-    from picisTopic.cistopic_class import create_cistopic_object
+    from pycisTopic.cistopic_class import create_cistopic_object
     from pycisTopic.lda_models import run_cgs_models_mallet
     
     n_topics = n_components[worker]
