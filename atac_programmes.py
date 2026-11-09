@@ -46,6 +46,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     seed = 19260817, force = False, savedir = None):
 
     import scanpy as sc
+    from scipy import sparse
     import pickle
     from pycisTopic.cistopic_class import create_cistopic_object
     from pycisTopic.lda_models import run_cgs_models_mallet
@@ -68,7 +69,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         adata = adata[selected_cells.index, :].to_memory()
     else: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix))
 
-    X = adata.X.T
+    X = sparse.csr_matrix(adata.X)
     cell_names = adata.obs_names.values
     peak_names = adata.var_names.values
     cistopic_obj = create_cistopic_object(X, cell_names, peak_names)
