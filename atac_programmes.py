@@ -69,7 +69,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         adata = adata[selected_cells.index, :].to_memory()
     else: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix))
 
-    X = sparse.csr_matrix(adata.X)
+    X = sparse.csr_matrix(adata.X.T)
     cell_names = adata.obs_names.tolist()
     peak_names = adata.var_names.tolist()
     cistopic_obj = create_cistopic_object(X, cell_names, peak_names)
