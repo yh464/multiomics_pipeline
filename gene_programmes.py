@@ -141,15 +141,27 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding')
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
-        for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
+        # for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
+        #     figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
+        #     if os.path.isfile(figname) and not force: continue
+        #     fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
+        #     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
+        #     plt.close(fig)
+        #     fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
+        #     fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
+        #     plt.close(fig_scaled)
+        # parallelise the above for loop across all score_cols
+        def plot_embedding(col):
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
-            if os.path.isfile(figname) and not force: continue
+            if os.path.isfile(figname) and not force: return
             fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
             fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
             fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
             fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
             plt.close(fig_scaled)
+        with Pool(min(max(cpu_count(),8), len(score_cols))) as pool:
+            tqdm(pool.imap(plot_embedding,score_cols), total = len(score_cols), desc = f'Plotting factor embedding regression in {emb_key} space')
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
 
 def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
@@ -444,7 +456,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         ax1.set_xlabel('Number of components (k)', fontsize = 14)
         lines = ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
         ax1.legend(lines[:3], ['Prediction error','Silhouette score','PCA variance ratio'], loc = 'upper center', frameon = False,
-            bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5, fontsize = 12)
+            bbox_to_anchor = (0.3, -0.3), ncol = 3, columnspacing = 0.5, fontsize = 14)
 
         sns.histplot(local_density.values, ax = ax_density, binwidth = 0.02, color = '#6a3d9a')
         bin_counts = np.histogram(local_density.values, bins = np.arange(0, 1.05, 0.02))[0]
