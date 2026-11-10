@@ -128,6 +128,16 @@ def factor_correlation(loadings, out_tabular, out_fig):
     plt.close(fig)
     return corr_mat
 
+def _plot_factor_embedding(args):
+    col, scores, adata, emb_key, figname, vmax, force = args
+    if os.path.isfile(figname) and not force: return
+    fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
+    fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
+    plt.close(fig)
+    fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
+    fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
+    plt.close(fig_scaled)
+
 def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force = False):
     log.log(f'Plotting cell-level scores in embedding space: ' + ', '.join(embedding_key), calling_file = 'run_cnmf')
     os.makedirs(os.path.dirname(out_fig), exist_ok = True)
@@ -141,28 +151,31 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding')
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
-        for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
-            figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
-            if os.path.isfile(figname) and not force: continue
-            fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
-            fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
-            plt.close(fig)
-            fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
-            fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
-            plt.close(fig_scaled)
-        # parallelise the above for loop across all score_cols
-        # def plot_embedding(col):
-        #     figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
-        #     if os.path.isfile(figname) and not force: return
-        #     fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
-        #     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
-        #     plt.close(fig)
-        #     fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
-        #     fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
-        #     plt.close(fig_scaled)
-        # with Pool(min(max(cpu_count(),8), len(score_cols))) as pool:
-        #     list(tqdm(pool.imap(plot_embedding,score_cols), total = len(score_cols), desc = f'Plotting factor embedding regression in {emb_key} space'))
+        tasks = [
+            (col, scores, adata, emb_key,
+            out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', '')),
+            vmax, force) for col in score_cols
+        ]
+        pool = Pool(min(max(cpu_count(), 8), len(tasks)))
+        try: _ = list(tqdm(pool.imap(_plot_factor_embedding, tasks), total = len(tasks),
+                desc = f'Plotting factor embedding regression in {emb_key} space'))
+        except: 
+            pool.terminate()
+            raise
+        else: pool.close()
+        finally: pool.join()
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
+
+def _plot_factor_time_reg(args):
+    scores, time_key, col, cell_type_key, time_xlabel, fig_1order, fig_2order, force = args
+    if not os.path.isfile(fig_1order) or force:
+        fig = temporal_regplot(scores, time_key, col, hue = cell_type_key, xlabel = time_xlabel, annotate_corr = False)
+        fig.savefig(fig_1order, bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
+    if not os.path.isfile(fig_2order) or force:
+        fig = temporal_regplot(scores, time_key, col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
+        fig.savefig(fig_2order, bbox_inches = 'tight', dpi = 400)
+        plt.close(fig)
 
 def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
     log.log(f'Plotting factor temporal regression for: ' + ', '.join(time_keys), calling_file = 'run_cnmf')
@@ -177,18 +190,21 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
             continue
         time_xlabel = '' if time_key.find('pseudo') > -1 else time_key.replace('_',' ')
         scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
-        for col in tqdm(score_cols, desc = f'Plotting factor temporal regression for {time_key}'):
-            fig_1order = out_fig.replace('$factor', col).replace('$timekey', time_key)
-            fig_2order = out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.pdf', '_order2.pdf').replace('.png', '_order2.png')
-            if os.path.isfile(fig_1order) and os.path.isfile(fig_2order) and not force: continue
-            if not os.path.isfile(fig_1order) or force:
-                fig = temporal_regplot(scores_tmp, time_key, col, hue = cell_type_key, xlabel = time_xlabel, annotate_corr = False)
-                fig.savefig(fig_1order, bbox_inches = 'tight', dpi = 400)
-                plt.close(fig)
-            if not os.path.isfile(fig_2order) or force:
-                fig = temporal_regplot(scores_tmp, time_key, col, hue = cell_type_key, order = 2, xlabel = time_xlabel)
-                fig.savefig(fig_2order, bbox_inches = 'tight', dpi = 400)
-                plt.close(fig)
+        tasks = [
+            (scores_tmp, time_key, col, cell_type_key, time_xlabel,
+             out_fig.replace('$factor', col).replace('$timekey', time_key),
+             out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.pdf', '_order2.pdf').replace('.png', '_order2.png'),
+             force)
+            for col in score_cols
+        ]
+        pool = Pool(min(max(cpu_count(), 8), len(tasks)))
+        try: _ = list(tqdm(pool.imap(_plot_factor_time_reg, tasks), total = len(tasks),
+                desc = f'Plotting factor temporal regression for {time_key}'))
+        except:
+            pool.terminate()
+            raise
+        else: pool.close()
+        finally: pool.join()
     log.log(f'Factor temporal regression plots saved to {os.path.dirname(out_fig)}', calling_file = 'run_cnmf')
 # endregion
 
