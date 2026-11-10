@@ -160,6 +160,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
             fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
             plt.close(fig_scaled)
+            return figname # return a value so that tqdm waits for figures to be saved
         with Pool(min(max(cpu_count(),8), len(score_cols))) as pool:
             tqdm(pool.imap(plot_embedding,score_cols), total = len(score_cols), desc = f'Plotting factor embedding regression in {emb_key} space')
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
