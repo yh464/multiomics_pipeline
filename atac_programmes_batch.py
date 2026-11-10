@@ -19,8 +19,10 @@ add_cmd_args = add_slurm_args_dec(add_cmd_args)
 from _utils.adatatools import select_metadata_cols, check_atac
 
 def main(args):
-    cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
+    cistopic_prep_submitter = array_submitter(name = 'cistopic_prep_batch_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic')
+    cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic', dependency = cistopic_prep_submitter)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cistopic_outdir = 'programmes/cistopic/$dataset/$prefix'
@@ -49,12 +51,21 @@ def main(args):
         cmd = f'python atac_programmes.py {dataset} {prefix} '+ ' '.join(flags)
 
         if args.cistopic: 
+            cmds = []
             for i in (incomplete := check_cistopic_complete(dataset, prefix, 
                 n_components = range(args.cistopic_components[0], args.cistopic_components[1]+1, args.cistopic_components[2])
                 ) if len(args.cistopic_components) == 3 else [args.cistopic_components]):
-                cistopic_submitter.add(cmd + f' --cistopic --worker {i}')
+                cmds.append(cmd + f' --cistopic --worker {i}')
             if len(incomplete) == 0:
-                cistopic_submitter.add(cmd + f' --cistopic --worker 0')
+                cmds.append(cmd + f' --cistopic --worker 0')
+
+            if not os.path.isfile(f'{cistopic_outdir}/temp/corpus.mallet'):
+                log.log(f'Pre-processed corpus file not found for {dataset} {prefix}, submitting pre-processing job')
+                cistopic_prep_submitter.add(cmds.pop(0))
+                for c in cmds: cistopic_submitter.add(c)
+            else:
+                for c in cmds: cistopic_submitter.add(c)
+
         if args.scopen:
             for i in range(len(args.scopen_components)): cistopic_submitter.add(cmd + f' --scopen --worker {i}')
 
