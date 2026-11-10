@@ -141,27 +141,27 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding')
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
-        # for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
-        #     figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
-        #     if os.path.isfile(figname) and not force: continue
-        #     fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
-        #     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
-        #     plt.close(fig)
-        #     fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
-        #     fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
-        #     plt.close(fig_scaled)
-        # parallelise the above for loop across all score_cols
-        def plot_embedding(col):
+        for col in tqdm(score_cols, desc = f'Plotting factor embedding regression in {emb_key} space'):
             figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
-            if os.path.isfile(figname) and not force: return
+            if os.path.isfile(figname) and not force: continue
             fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
             fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
             plt.close(fig)
             fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
             fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
             plt.close(fig_scaled)
-        with Pool(min(max(cpu_count(),8), len(score_cols))) as pool:
-            list(tqdm(pool.imap(plot_embedding,score_cols), total = len(score_cols), desc = f'Plotting factor embedding regression in {emb_key} space'))
+        # parallelise the above for loop across all score_cols
+        # def plot_embedding(col):
+        #     figname = out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', ''))
+        #     if os.path.isfile(figname) and not force: return
+        #     fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
+        #     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
+        #     plt.close(fig)
+        #     fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
+        #     fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
+        #     plt.close(fig_scaled)
+        # with Pool(min(max(cpu_count(),8), len(score_cols))) as pool:
+        #     list(tqdm(pool.imap(plot_embedding,score_cols), total = len(score_cols), desc = f'Plotting factor embedding regression in {emb_key} space'))
     log.log(f'Factor embedding plots saved to {os.path.dirname(out_fig)}', calling_file = 'factor_embedding')
 
 def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudotime'], force = False):
