@@ -59,7 +59,8 @@ def main(args):
             if len(incomplete) == 0:
                 cmds.append(cmd + f' --cistopic --worker 0')
 
-            if not os.path.isfile(f'{cistopic_outdir}/temp/corpus.mallet'.replace('$dataset', dataset).replace('$prefix', prefix)):
+            cistopic_dir = os.path.dirname(proj.to_pathname('atac_programmes_cistopic', dataset = dataset, prefix = prefix, k = incomplete[0]))
+            if not os.path.isfile(f'{cistopic_dir}/temp/corpus.mallet'):
                 log.log(f'Pre-processed corpus file not found for {dataset} {prefix}, submitting pre-processing job')
                 cistopic_prep_submitter.add(cmds.pop(0))
                 for c in cmds: cistopic_submitter.add(c)
