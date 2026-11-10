@@ -85,7 +85,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         
         models = run_cgs_models_mallet(cistopic_obj, n_topics = [n_topics], n_iter = niter, n_cpu = n_cpu,
             alpha = alpha, eta = eta, alpha_by_topic = True, eta_by_topic = False,
-            random_state = seed, tmp_path = f'{outdir}/temp', save_path = f'{outdir}/temp', mallet_path = mallet,
+            random_state = seed, tmp_path = f'{outdir}/temp_{n_topics}', save_path = f'{outdir}/temp', mallet_path = mallet,
             )
         with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.model.pkl', 'wb') as f: pickle.dump(models[0], f)
 
