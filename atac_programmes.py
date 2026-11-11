@@ -54,21 +54,23 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     n_topics = n_components[worker]
     os.makedirs(f'{outdir}/temp', exist_ok = True)
 
-    # automatically downsample to 10000 cells per cell type if downsample is set to -1 and multiple n_component values are used
-    if downsample == -1 and len(n_components) > 1: 
-        log.log(f'Automatically downsampling to 10000 cells per cell type for {dataset} {prefix} since multiple n_components are used', calling_file = 'run_cistopic')
-        downsample = 10000
-
+    # downsample cells if requested
+    adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+    # if downsample is -1, downsample so that the total number of cells is around 100000
+    # no downsampling if fewer than 150000 cells
+    if downsample == -1 and adata.shape[0] > 150000:
+        downsample = max(1, int(100000 / adata.obs.groupby(cell_type[0]).ngroups))
     if downsample > 0:
-        adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
         # print number of cells per cell type
         log.log(f'Number of cells per cell type for {dataset} {prefix}:', calling_file = 'run_cistopic')
         for cell_type_name in adata.obs.groupby(cell_type[0]).size().index:
             log.log(f'  {cell_type_name}: {adata.obs[adata.obs[cell_type[0]] == cell_type_name].shape[0]}', calling_file = 'run_cistopic')
-        selected_cells = adata.obs.groupby(cell_type[0]).sample(n = downsample, replace = False, random_state = seed)
-        adata = adata[selected_cells.index, :].to_memory()
-    else: adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix))
+        selected_cells = adata.obs.groupby(cell_type[0]).apply(lambda x: x.sample(n = min(downsample, x.shape[0]), replace = False, random_state = seed)).reset_index(drop = True)
+        adata = adata[selected_cells.index.droplevel(0), :].to_memory()
+    else: adata = adata.to_memory()
 
+    if adata.shape[0] > 150000:
+        log.warn(f'Number of cells in {dataset} {prefix} is {adata.shape[0]}. This may take a long time to run and may require more memory. Consider downsampling.', calling_file = 'run_cistopic')
     X = sparse.csr_matrix(adata.X.T)
     cell_names = adata.obs_names.tolist()
     peak_names = adata.var_names.tolist()
