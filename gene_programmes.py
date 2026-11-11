@@ -129,12 +129,14 @@ def factor_correlation(loadings, out_tabular, out_fig):
     return corr_mat
 
 def _plot_factor_embedding(args):
-    col, scores, adata, emb_key, figname, vmax, force = args
+    col, scores, emb, emb_key, figname, vmax, force = args
     if os.path.isfile(figname) and not force: return
-    fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
+    fig = scatterplot_noaxis(x = emb[:, 0], y = emb[:, 1], v = scores[col], vname = col, rep = emb_key)
+    # fig = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False)
     fig.savefig(figname, bbox_inches = 'tight', dpi = 400)
     plt.close(fig)
-    fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
+    fig_scaled = scatterplot_noaxis(x = emb[:, 0], y = emb[:, 1], v = scores[col], vname = col, rep = emb_key, vmax = vmax)
+    # fig_scaled = scatterplot_adata(adata, v = scores[col], rep = emb_key, full = False, vmax = vmax)
     fig_scaled.savefig(figname.replace('.pdf', '_scaled.pdf').replace('.png', '_scaled.png'), bbox_inches = 'tight', dpi = 400)
     plt.close(fig_scaled)
 
@@ -151,8 +153,11 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             log.warn(f'Embedding key {emb_key} not found in adata.obsm, skipping.', calling_file = 'factor_embedding')
             continue
         scores = pd.concat([scores, adata.obs], axis = 1)
+        emb_name = emb_key.replace('X_', '')
+        if emb_name == 'umap': emb_name = 'UMAP'
+        if emb_name == 'tsne': emb_name = 'tSNE'
         tasks = [
-            (col, scores, adata, emb_key,
+            (col, scores, adata.obsm[emb_key], emb_name, 
             out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', '')),
             vmax, force) for col in score_cols
         ]
@@ -370,7 +375,8 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     else: time.sleep(15) # this step is fast enough, no time limit needed 
 
     # run NMF iterations
-    cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
+    if not check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter, update = False)[0] or force:
+        cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
     log.log(f'Worker {worker_id} completed NMF iterations', calling_file = 'run_cnmf')
     if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter, update = False)[0]:
         log.warn('Waiting for other workers to complete iterations', calling_file = 'run_cnmf')
