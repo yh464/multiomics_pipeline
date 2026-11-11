@@ -66,6 +66,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         for cell_type_name in adata.obs.groupby(cell_type[0]).size().index:
             log.log(f'  {cell_type_name}: {adata.obs[adata.obs[cell_type[0]] == cell_type_name].shape[0]}', calling_file = 'run_cistopic')
         selected_cells = adata.obs.groupby(cell_type[0]).apply(lambda x: x.sample(n = min(downsample, x.shape[0]), replace = False, random_state = seed))
+        print(selected_cells.index)
         if isinstance(selected_cells.index, pd.MultiIndex): selected_cells.index = selected_cells.index.droplevel(0)
         adata = adata[selected_cells.index, :].to_memory()
     else: adata = adata.to_memory()
