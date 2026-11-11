@@ -187,3 +187,22 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     adata = adata[:, adata.X.sum(axis = 0) > 0] # subset to genes with at least one non-zero count
     sc.write(h5ad_out, adata)
     adata.file.close()
+
+# functions for in-memory anndata operations
+def downsample_adata(adata, downsample = -1, group_by = None, seed = 19260817):
+    # if downsample is -1, downsample so that the total number of cells is around 100000
+    # no downsampling if fewer than 150000 cells
+    if downsample == -1 and adata.shape[0] > 150000:
+        if group_by: downsample = max(1, int(100000 / adata.obs.groupby(group_by).ngroups))
+        else: downsample = 100000
+    if downsample > 0 and group_by:
+        log.log('Number of cells per cell type:', calling_file = 'downsample_adata')
+        for cell_type_name in adata.obs.groupby(group_by).size().index:
+            log.log(f'  {cell_type_name}: {adata.obs[adata.obs[group_by] == cell_type_name].shape[0]}', calling_file = 'downsample_adata')
+        selected_cells = adata.obs.groupby(group_by).apply(lambda x: x.sample(n = min(downsample, x.shape[0]), replace = False, random_state = seed))
+        if isinstance(selected_cells.index, pd.MultiIndex): selected_cells.index = selected_cells.index.droplevel(0)
+    elif downsample > 0:
+        selected_cells = adata.obs.sample(n = min(downsample, adata.shape[0]), replace = False, random_state = seed)
+    else: selected_cells = adata.obs
+    adata = adata[selected_cells.index, :].to_memory()
+    return adata
