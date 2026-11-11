@@ -52,6 +52,8 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     from pycisTopic.lda_models import run_cgs_models_mallet
     
     n_topics = n_components[worker]
+    if len(n_components) == 1 and niter < 200:
+        log.warn(f'n_iter < 200 is usually suitable only for model screening, consider increasing n_iter for final model fitting', calling_file = 'run_cistopic')
     os.makedirs(f'{outdir}/temp', exist_ok = True)
 
     # downsample cells if requested
