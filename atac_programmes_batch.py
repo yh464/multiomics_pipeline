@@ -24,9 +24,9 @@ def main(args):
     cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
         partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic', dependency = cistopic_prep_submitter)
     scopen_prep_submitter = array_submitter(name = 'scopen_prep_batch_' + '_'.join(args.datasets),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scOpen')
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen')
     scopen_submitter = array_submitter(name = 'scopen_batch_' + '_'.join(args.datasets)+'_'+str(max(args.scopen_components)),
-        partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scOpen', dependency = scopen_prep_submitter)
+        partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen', dependency = scopen_prep_submitter)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cistopic_outdir = 'programmes/cistopic/$dataset/$prefix'

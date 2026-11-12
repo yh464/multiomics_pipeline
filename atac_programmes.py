@@ -101,13 +101,13 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
             with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'rb') as f: model_list.append(pickle.load(f))
 
         k_selection_metrics = pd.concat([m.metrics.assign(k = m.n_topic) for m in model_list]).set_index('k').sort_index().reset_index()
-        k_selection_metrics.columns = ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
+        k_selection_metrics.columns = ['k','arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
         k_selection_metrics.to_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', index = False, sep = '\t')
         k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1
 
         # rescale all metrics to [0, 1] for comparison
         k_selection_metrics_scaled = k_selection_metrics.copy()
-        for col in ['k','arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
+        for col in ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
             k_selection_metrics_scaled[col] = (k_selection_metrics[col] - k_selection_metrics[col].min()) / (k_selection_metrics[col].max() - k_selection_metrics[col].min())
         
         # region: plot scaled metrics, similar to gene_programmes.py lines 423-447
