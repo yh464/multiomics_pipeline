@@ -173,9 +173,82 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
 # endregion
 
 # region: scOpen pipeline
-def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25),):
-    raise NotImplementedError('scOpen pipeline is not yet implemented')
+def check_scopen_complete(dataset, prefix, n_components = range(25, 501, 25)):
+    outdir = os.path.dirname(proj.to_pathname('atac_programmes_scopen', dataset, prefix))
+    os.makedirs(f'{outdir}/temp', exist_ok = True)
+    incomplete_idx = []
+    for i, n_topics in enumerate(n_components):
+        if not os.path.isfile(f'{outdir}/temp/{prefix}.scopen.k_{n_topics}.weights.txt'):
+            incomplete_idx.append(i)
+    return incomplete_idx
 
+def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_peaks = 100000, worker = 0,
+    downsample = -1, cell_type = ['cell_type'], embedding = ['X_umap', 'X_tsne'], time_key = ['pseudotime', 'age', 'time'],
+    seed = 19260817, force = False, savedir = None):
+
+    import scanpy as sc
+    import anndata as ad
+    from kneed import KneeLocator
+    from scopen.Main import tf_idf_transform, run_nmf
+    from _utils.gadgets import mv_symlink
+
+    os.makedirs(f'{outdir}/temp', exist_ok = True)
+
+    # downsample cells if requested
+    temp_h5ad_path = f'{outdir}/temp/{prefix}.hvp.h5ad'
+    tfidf_path = f'{outdir}/temp/{prefix}.tfidf.h5ad'
+    if worker == 0 and (not os.path.isfile(tfidf_path) or force):
+        adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
+        adata = downsample_adata(adata, group_by = cell_type[0] if len(cell_type) > 0 else None, downsample = downsample, seed = seed)
+        adata.X.data = 1 # convert to binary matrix
+        adata.X = adata.X.astype('int8')
+        sc.pp.filter_cells(adata, min_counts = 1000)
+        sc.pp.filter_genes(adata, min_cells = 10)
+
+        # select highly variable peaks
+        sc.pp.highly_variable_genes(adata, n_top_genes = n_peaks, flavor = 'seurat_v3')
+        adata_hvp = adata[:, adata.var['highly_variable']].copy()
+        sc.write(temp_h5ad_path, adata_hvp)
+        del adata
+
+        # run tf-idf transformation
+        adata_tfidf = ad.AnnData(X = tf_idf_transform(adata_hvp.X.T).T, obs = adata_hvp.obs.copy(), var = adata_hvp.var.copy())
+        sc.write(tfidf_path, adata_tfidf)
+        del adata_hvp
+
+    elif os.path.isfile(tfidf_path):
+        adata_tfidf = sc.read_h5ad(tfidf_path)
+    else:
+        log.warn('TF-IDF transformation not complete, please run again after worker 0 completes.', calling_file = 'run_scopen')
+        return
+
+    # run NMF decomposition based on TF-IDF transformed matrix
+    k = n_components[worker]
+    if not os.path.isfile(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt') or force:
+        log.log(f'Running scOpen model for {dataset} {prefix} with {k} components', calling_file = 'run_scopen')
+        nmf_output = run_nmf((adata_tfidf.X.T, k, 1, 200, 1, seed, 'nndsvd')) # alpha = 1, 200 iters, verbose = 1
+        W = nmf_output[0]; H = nmf_output[1]; error = nmf_output[2]
+        np.savetxt(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', W, delimiter = '\t')
+        np.savetxt(f'{outdir}/temp/{prefix}.scopen.k_{k}.scores.txt', H, delimiter = '\t')
+        with open(f'{outdir}/temp/{prefix}.scopen.k_{k}.error.txt', 'w') as f: print(error, file = f)
+    log.log(f'scOpen model for {dataset} {prefix} with {k} components completed', calling_file = 'run_scopen')
+    log.log(f'Output saved to {outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', calling_file = 'run_scopen')
+
+    # compare all values of k
+    if len(check_scopen_complete(dataset, prefix, n_components = n_components)) > 0:
+        log.log('Waiting for other workers to finish scOpen model fitting', calling_file = 'run_scopen')
+        return
+
+    df = pd.DataFrame(dict(n_components = n_components, 
+        error = [float(open(f'{outdir}/temp/{prefix}.scopen.k_{k}.error.txt').read().strip()) for k in n_components], knee = False))
+    kl = KneeLocator(df.n_components, df.error, curve = 'convex', direction = 'decreasing')
+    df.loc[df.n_components == kl.knee, 'knee'] = True
+    df.to_csv(f'{outdir}/{prefix}.scopen.k_selection_metrics.txt', index = False, sep = '\t')
+    if not os.path.islink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.weights.txt'):
+        mv_symlink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.weights.txt', f'{outdir}/{prefix}.scopen.k_{kl.knee}.weights.txt')
+    if not os.path.islink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.scores.txt'):
+        mv_symlink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.scores.txt', f'{outdir}/{prefix}.scopen.k_{kl.knee}.scores.txt')
+    log.log(f'Automatically selecting {kl.knee} components for {dataset} {prefix} based on knee point of reconstruction error', calling_file = 'run_scopen')
 # endregion
 
 @log.profile

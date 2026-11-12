@@ -14,7 +14,7 @@ from _utils.path import project
 proj = project()
 
 from _utils.slurm import array_submitter, add_slurm_args_dec
-from atac_programmes import add_cmd_args, check_cistopic_complete
+from atac_programmes import add_cmd_args, check_cistopic_complete, check_scopen_complete
 add_cmd_args = add_slurm_args_dec(add_cmd_args)
 from _utils.adatatools import select_metadata_cols, check_atac
 
@@ -22,7 +22,11 @@ def main(args):
     cistopic_prep_submitter = array_submitter(name = 'cistopic_prep_batch_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic')
     cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic', dependency = cistopic_prep_submitter)
+        partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/pycisTopic', dependency = cistopic_prep_submitter)
+    scopen_prep_submitter = array_submitter(name = 'scopen_prep_batch_' + '_'.join(args.datasets),
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scOpen')
+    scopen_submitter = array_submitter(name = 'scopen_batch_' + '_'.join(args.datasets)+'_'+str(max(args.scopen_components)),
+        partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scOpen', dependency = scopen_prep_submitter)
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cistopic_outdir = 'programmes/cistopic/$dataset/$prefix'
@@ -68,9 +72,24 @@ def main(args):
                 for c in cmds: cistopic_submitter.add(c)
 
         if args.scopen:
-            for i in range(len(args.scopen_components)): cistopic_submitter.add(cmd + f' --scopen --worker {i}')
+            cmds = []
+            for i in (incomplete := check_scopen_complete(dataset, prefix, 
+                n_components = range(args.scopen_components[0], args.scopen_components[1]+1, args.scopen_components[2])
+                ) if len(args.scopen_components) == 3 else [args.scopen_components]):
+                cmds.append(cmd + f' --scopen --worker {i}')
+            if len(incomplete) == 0:
+                cmds.append(cmd + f' --scopen --worker 0')
+
+            scopen_dir = os.path.dirname(proj.to_pathname('atac_programmes_scopen', dataset = dataset, prefix = prefix, k = incomplete[0]))
+            if not os.path.isfile(f'{scopen_dir}/temp/{prefix}.tfidf.h5ad'):
+                log.log(f'Pre-processed TF-IDF file not found for {dataset} {prefix}, submitting pre-processing job')
+                scopen_prep_submitter.add(cmds.pop(0))
+                for c in cmds: scopen_submitter.add(c)
+            else:
+                for c in cmds: scopen_submitter.add(c)
 
     cistopic_submitter.submit()
+    scopen_submitter.submit()
 
 if __name__ == '__main__':
     import argparse
