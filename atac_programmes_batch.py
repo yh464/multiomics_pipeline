@@ -63,7 +63,8 @@ def main(args):
             if len(incomplete) == 0:
                 cmds.append(cmd + f' --cistopic --worker 0')
 
-            cistopic_dir = os.path.dirname(proj.to_pathname('atac_programmes_cistopic', dataset = dataset, prefix = prefix, k = incomplete[0]))
+            cistopic_dir = os.path.dirname(
+                proj.to_pathname('atac_programmes_cistopic', dataset = dataset, prefix = prefix, k = args.n_components[0]))
             if not os.path.isfile(f'{cistopic_dir}/temp/corpus.mallet'):
                 log.log(f'Pre-processed corpus file not found for {dataset} {prefix}, submitting pre-processing job')
                 cistopic_prep_submitter.add(cmds.pop(0))
@@ -80,7 +81,8 @@ def main(args):
             if len(incomplete) == 0:
                 cmds.append(cmd + f' --scopen --worker 0')
 
-            scopen_dir = os.path.dirname(proj.to_pathname('atac_programmes_scopen', dataset = dataset, prefix = prefix, k = incomplete[0]))
+            scopen_dir = os.path.dirname(
+                proj.to_pathname('atac_programmes_scopen', dataset = dataset, prefix = prefix, k = args.n_components[0]))
             if not os.path.isfile(f'{scopen_dir}/temp/{prefix}.tfidf.h5ad'):
                 log.log(f'Pre-processed TF-IDF file not found for {dataset} {prefix}, submitting pre-processing job')
                 scopen_prep_submitter.add(cmds.pop(0))
