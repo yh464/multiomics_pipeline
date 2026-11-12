@@ -32,7 +32,7 @@ def main(args):
     cistopic_outdir = 'programmes/cistopic/$dataset/$prefix'
     proj.register('atac_programmes_cistopic',f'{cistopic_outdir}/$prefix.cistopic.k_$k.topic_loadings.txt.gz')
     scopen_outdir = 'programmes/scopen/$dataset/$prefix'
-    proj.register('atac_programmes_scopen',f'{scopen_outdir}/$prefix.scopen.k_$k.dt_$dt.consensus.txt')
+    proj.register('atac_programmes_scopen',f'{scopen_outdir}/$prefix.scopen.k_$k.weights.txt')
 
     for dataset, prefix in h5ad:
         if not check_atac(dataset, prefix): continue
@@ -56,7 +56,7 @@ def main(args):
 
         if args.cistopic: 
             cmds = []
-            for i in (incomplete := check_cistopic_complete(dataset, prefix, 
+            for i in (incomplete := check_cistopic_complete(dataset, prefix, niter = args.niter,
                 n_components = range(args.cistopic_components[0], args.cistopic_components[1]+1, args.cistopic_components[2])
                 ) if len(args.cistopic_components) == 3 else [args.cistopic_components]):
                 cmds.append(cmd + f' --cistopic --worker {i}')

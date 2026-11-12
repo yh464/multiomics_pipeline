@@ -31,12 +31,12 @@ from _utils.path import project
 proj = project()
 
 # region: cisTopic pipeline
-def check_cistopic_complete(dataset, prefix, n_components = range(25, 501, 25)):
+def check_cistopic_complete(dataset, prefix, n_components = range(25, 501, 25), niter = 100):
     outdir = os.path.dirname(proj.to_pathname('atac_programmes_cistopic', dataset, prefix))
     os.makedirs(f'{outdir}/temp', exist_ok = True)
     incomplete_idx = []
     for i, n_topics in enumerate(n_components):
-        if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.model.pkl'):
+        if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl'):
             incomplete_idx.append(i)
     return incomplete_idx
 
@@ -69,7 +69,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     cistopic_obj.add_cell_data(adata.obs)
 
     # run cistopic model
-    if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.model.pkl') or force:
+    if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl') or force:
         log.log(f'Running cistopic model for {dataset} {prefix} with {n_topics} topics', calling_file = 'run_cistopic')
 
         from _utils.slurm import get_slurm_config
@@ -78,21 +78,27 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         
         models = run_cgs_models_mallet(cistopic_obj, n_topics = [n_topics], n_iter = niter, n_cpu = n_cpu,
             alpha = alpha, eta = eta, alpha_by_topic = True, eta_by_topic = False,
-            random_state = seed, tmp_path = f'{outdir}/temp', save_path = f'{outdir}/temp', mallet_path = mallet,
-            reuse_corpus = True
+            random_state = seed, save_path = f'{outdir}/temp', mallet_path = mallet,
+            reuse_corpus = True, tmp_path = f'{outdir}/temp'
             )
-        with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.model.pkl', 'wb') as f: pickle.dump(models[0], f)
+        with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'wb') as f: pickle.dump(models[0], f)
 
     if len(check_cistopic_complete(dataset, prefix, n_components = n_components)) > 0:
         log.log('Waiting for other workers to finish cistopic model fitting', calling_file = 'run_cistopic')
         return
+
+    # if all workers have finished, clean cache files that cannot be reused
+    os.system(f'rm {outdir}/temp/*state.mallet.gz')
+    os.system(f'rm {outdir}/temp/*inferencer.mallet')
+    os.system(f'rm {outdir}/temp/*doctopics.txt')
+    os.system(f'rm {outdir}/temp/*topickeys.txt')
 
     # compare models
     if len(n_components) > 1:
         log.log(f'Comparing cistopic models for {dataset} {prefix}', calling_file = 'run_cistopic')
         model_list = []
         for n_topics in n_components:
-            with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.model.pkl', 'rb') as f: model_list.append(pickle.load(f))
+            with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'rb') as f: model_list.append(pickle.load(f))
 
         k_selection_metrics = pd.concat([m.metrics.assign(k = m.n_topic) for m in model_list]).set_index('k').sort_index().reset_index()
         k_selection_metrics.columns = ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
@@ -143,7 +149,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         k_optim = n_components[0]
 
     # export best model loadings and binarised sets
-    with open(f'{outdir}/temp/{prefix}.cistopic.k_{k_optim}.model.pkl', 'wb') as f:
+    with open(f'{outdir}/temp/{prefix}.cistopic.k_{k_optim}.{niter}iter.model.pkl', 'wb') as f:
         best_model = pickle.load(f)
     best_model.topic_region.T.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', sep = '\t')
     cell_topic = best_model.cell_topic.T # rows are now cells, columns are topics
