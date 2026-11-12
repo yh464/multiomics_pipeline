@@ -107,7 +107,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
 
         # rescale all metrics to [0, 1] for comparison
         k_selection_metrics_scaled = k_selection_metrics.copy()
-        for col in ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
+        for col in ['k','arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
             k_selection_metrics_scaled[col] = (k_selection_metrics[col] - k_selection_metrics[col].min()) / (k_selection_metrics[col].max() - k_selection_metrics[col].min())
         
         # region: plot scaled metrics, similar to gene_programmes.py lines 423-447
