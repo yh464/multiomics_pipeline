@@ -94,15 +94,8 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
         for n_topics in n_components:
             with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.model.pkl', 'rb') as f: model_list.append(pickle.load(f))
 
-        k_selection_metrics = pd.DataFrame(
-            [{
-            "n_topics": m.n_topic,
-            "arun_2010": m.Arun_2010,
-            "cao_juan_2009": m.Cao_Juan_2009,
-            "mimno_2011": m.Mimno_2011,
-            "loglikelihood": m.loglikelihood,
-            } for m in model_list]
-            )
+        k_selection_metrics = pd.concat([m.metrics.assign(k = m.n_topic) for m in model_list]).set_index('k').sort_index().reset_index()
+        k_selection_metrics.columns = ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
         k_selection_metrics.to_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', index = False, sep = '\t')
         k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1
 
