@@ -199,7 +199,7 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     if worker == 0 and (not os.path.isfile(tfidf_path) or force):
         adata = sc.read_h5ad(proj.to_pathname('raw', dataset, prefix), 'r')
         adata = downsample_adata(adata, group_by = cell_type[0] if len(cell_type) > 0 else None, downsample = downsample, seed = seed)
-        adata.X.data = 1 # convert to binary matrix
+        adata.X.data[:] = 1 # convert to binary matrix
         adata.X = adata.X.astype('int8')
         sc.pp.filter_cells(adata, min_counts = 1000)
         sc.pp.filter_genes(adata, min_cells = 10)
