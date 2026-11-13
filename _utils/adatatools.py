@@ -52,31 +52,40 @@ def check_atac(dataset = None, prefix = None, adata = None):
             if var_names.str.contains('ENSG').any():
                 log.warn('Gene names in var_names appear to be Ensembl IDs, press Ctrl+C to abort if input dataset is not ATAC-seq', calling_file = 'check_atac')
 
-    chrom_col, start_col, end_col = select_metadata_cols(
-        dataset = dataset, prefix = prefix, adata = adata,
-        axis = 'var', input_string = 'chromosome, start and end, in that order', default = ['Chrom','Start','End'])
-
     genome_build = input('Enter genome build (hg19 or hg38): (Default: hg38)').strip()
     while genome_build not in ['hg19', 'hg38', '']:
         genome_build = input('Invalid genome build, please enter hg19 or hg38: ').strip()
     genome_build = genome_build or 'hg38'
     lift_to = 'hg38' if genome_build == 'hg19' else 'hg19'
 
-    # load chromosome, start and end coordinates from adata or h5ad file
-    coords = dict(hg19 = dict(), hg38 = dict())
-    if adata is not None:
-        coords[genome_build]['chrom'] = 'chr' + adata.var[chrom_col].astype(str).str.replace('chr', '', regex = False).str.strip().replace(
-            {'23': 'X', '24': 'Y', '25': 'M', '26': 'M', 'MT': 'M'})
-        coords[genome_build]['start'] = adata.var[start_col].astype(int)
-        coords[genome_build]['end'] = adata.var[end_col].astype(int)
+    # create chromosome, start and end columns if the var_names satisfy the format chr:start-end, otherwise prompt user to select the columns and read from file
+    if var_names.str.match(r'chr[0-9XYM]+:[0-9]+-[0-9]+').all():
+        chrom = var_names.str.split(':|-', expand = True)[0]
+        start = var_names.str.split(':|-', expand = True)[1].astype(int)
+        end = var_names.str.split(':|-', expand = True)[2].astype(int)
     else:
-        with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
-            chrom = h5py_get_col(file['var'][chrom_col])
-            coords[genome_build]['chrom'] = 'chr' + pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
-                {'23': 'X', '24': 'Y', '25': 'XY', '26': 'M', 'MT': 'M'})
-            coords[genome_build]['start'] = h5py_get_col(file['var'][start_col]).astype(int)
-            coords[genome_build]['end'] = h5py_get_col(file['var'][end_col]).astype(int)
+        chrom_col, start_col, end_col = select_metadata_cols(
+            dataset = dataset, prefix = prefix, adata = adata,
+            axis = 'var', input_string = 'chromosome, start and end, in that order', default = ['Chrom','Start','End'])
 
+        # load chromosome, start and end coordinates from adata or h5ad file
+        if adata is not None:
+            chrom = 'chr' + adata.var[chrom_col].astype(str).str.replace('chr', '', regex = False).str.strip().replace(
+                {'23': 'X', '24': 'Y', '25': 'M', '26': 'M', 'MT': 'M'})
+            start = adata.var[start_col].astype(int)
+            end = adata.var[end_col].astype(int)
+        else:
+            with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
+                chrom = h5py_get_col(file['var'][chrom_col])
+                chrom = 'chr' + pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
+                    {'23': 'X', '24': 'Y', '25': 'XY', '26': 'M', 'MT': 'M'})
+                start = h5py_get_col(file['var'][start_col]).astype(int)
+                end = h5py_get_col(file['var'][end_col]).astype(int)
+
+    coords = dict(hg19 = dict(), hg38 = dict())
+    coords[genome_build]['chrom'] = chrom
+    coords[genome_build]['start'] = start
+    coords[genome_build]['end'] = end
     coords[lift_to] = dict(chrom = coords[genome_build]['chrom'], start = [], end = [])
 
     from liftover import LiftOver
