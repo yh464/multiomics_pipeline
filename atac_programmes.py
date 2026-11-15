@@ -262,7 +262,7 @@ def main(args):
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817, downsample = args.downsample,
             force = args.force, savedir = args.magma_out if args.magma else None)
     if args.scopen:
-        run_scopen(args.dataset, args.prefix, scopen_outdir, n_components = args.scopen_components,
+        run_scopen(args.dataset, args.prefix, scopen_outdir, n_components = args.scopen_components, worker = args.worker,
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817,
             force = args.force, savedir = args.magma_out if args.magma else None)
 
