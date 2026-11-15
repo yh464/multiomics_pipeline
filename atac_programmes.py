@@ -201,8 +201,8 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
         adata = downsample_adata(adata, group_by = cell_type[0] if len(cell_type) > 0 else None, downsample = downsample, seed = seed)
         adata.X.data[:] = 1 # convert to binary matrix
         adata.X = adata.X.astype('int8')
-        sc.pp.filter_cells(adata, min_counts = 1000)
-        sc.pp.filter_genes(adata, min_cells = 10)
+        sc.pp.filter_cells(adata, min_counts = 1)
+        sc.pp.filter_genes(adata, min_cells = 1)
 
         # select highly variable peaks
         sc.pp.highly_variable_genes(adata, n_top_genes = n_peaks, flavor = 'seurat_v3')
@@ -226,9 +226,11 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     if not os.path.isfile(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt') or force:
         log.log(f'Running scOpen model for {dataset} {prefix} with {k} components', calling_file = 'run_scopen')
         nmf_output = run_nmf((adata_tfidf.X.T, k, 1, 200, 1, seed, 'nndsvd')) # alpha = 1, 200 iters, verbose = 1
-        W = nmf_output[0]; H = nmf_output[1]; error = nmf_output[2]
-        np.savetxt(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', W, delimiter = '\t')
-        np.savetxt(f'{outdir}/temp/{prefix}.scopen.k_{k}.scores.txt', H, delimiter = '\t')
+        W = pd.DataFrame(nmf_output[0], index = adata_tfidf.var_names, columns = [f'F{i}' for i in range(1, k + 1)])
+        H = pd.DataFrame(nmf_output[1], index = [f'F{i}' for i in range(1, k + 1)], columns = adata_tfidf.obs_names)
+        error = nmf_output[2]
+        W.to_csv(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', sep = '\t')
+        H.to_csv(f'{outdir}/temp/{prefix}.scopen.k_{k}.scores.txt', sep = '\t')
         with open(f'{outdir}/temp/{prefix}.scopen.k_{k}.error.txt', 'w') as f: print(error, file = f)
     log.log(f'scOpen model for {dataset} {prefix} with {k} components completed', calling_file = 'run_scopen')
     log.log(f'Output saved to {outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', calling_file = 'run_scopen')

@@ -59,7 +59,7 @@ def check_atac(dataset = None, prefix = None, adata = None):
     lift_to = 'hg38' if genome_build == 'hg19' else 'hg19'
 
     # create chromosome, start and end columns if the var_names satisfy the format chr:start-end, otherwise prompt user to select the columns and read from file
-    if var_names.str.match(r'chr[0-9XYM]+:[0-9]+-[0-9]+').all():
+    if var_names.str.match(r'chr[0-9XYM]+:[0-9]+-[0-9]+').mean() > 0.9: # allow for some peaks in other scaffolds e.g. KI270713.1
         chrom = var_names.str.split(':|-', expand = True)[0]
         start = var_names.str.split(':|-', expand = True)[1].astype(int)
         end = var_names.str.split(':|-', expand = True)[2].astype(int)
