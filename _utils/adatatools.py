@@ -77,7 +77,7 @@ def check_atac(dataset = None, prefix = None, adata = None):
         else:
             with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r+') as file:
                 var = file['var']
-                var.create_dataset(chrom_col, data = chrom.values.astype(bytes).astype(object), dtype = 'object')
+                var.create_dataset(chrom_col, data = chrom.values.astype(bytes).astype(object))
                 var.create_dataset(start_col, data = start.values, dtype = 'int64')
                 var.create_dataset(end_col, data = end.values, dtype = 'int64')
                 var.attrs['column-order'] = np.array([chrom_col, start_col, end_col] + 
@@ -196,9 +196,9 @@ def select_metadata_cols(dataset = None, prefix = None, default = [], input_stri
     selected_cols = input(f'Enter the column numbers for {input_string}, separated by space: \n' + str(default) + ' ').strip()
     selected_cols = [columns[int(x)] for x in selected_cols.split()]
     if len(selected_cols) == 0: selected_cols = default
-    if len(selected_cols) == 0: log.warn('No valid cell type column selected/found, please check your input and dataset metadata')
+    if len(selected_cols) == 0: log.warn('No valid column selected/found, please check your input and dataset metadata')
     print()
-    log.log('Selected ' + input_string + ' columns: ')
+    log.log(f'Selected columns for {input_string}: ')
     for col in selected_cols: log.log(f'    {col}')
     return selected_cols
 
