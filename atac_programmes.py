@@ -156,19 +156,43 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     # normalise such that each cell sums to one
     cell_topic = cell_topic.div(cell_topic.sum(axis = 1), axis = 0)
     cell_topic.to_parquet(f'{outdir}/{prefix}.cistopic.k_{k_optim}.cell_topic.parquet', compression = 'gzip')
-
     cistopic_obj.add_LDA_model(best_model)
 
+    # binarise topics and annotate topics with cell types
     from pycisTopic.topic_binarization import binarize_topics
-    binarized_topics = binarize_topics(cistopic_obj, method = 'otsu')
-    with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.txt', 'w') as f: # MAGMA format
-        for k, peaks in binarized_topics.items():
-            print(' '.join([k] + list(peaks)), file = f)
+    from pycisTopic.topic_qc import topic_annotation
+    binarized_topics = binarize_topics(cistopic_obj, method = 'otsu') 
+    # returns a dict of f'Topic {i}': pd.DataFrame(topic_score, index = region_names, columns = [f'Topic {i}'])
+    # convert to MAGMA format: Topic_{i} region_1 region_2 ... region_n
+    with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarized_topics.txt', 'w') as f:
+        for topic, peaks in binarized_topics.items():
+            topic = topic.replace('Topic ', 'Topic_')
+            f.write(f'{topic} ' + ' '.join(peaks.index.tolist()) + '\n')
 
-    from pycisTopic.utils import region_names_to_coordinates
-    binarised_topics_bed = {k: region_names_to_coordinates(peaks).sort_values(by = ['Chromosome','Start','End']) for k, peaks in binarized_topics.items()}
+    topic_annot = pd.concat([
+        topic_annotation(cistopic_obj, annot_var = ct, binarized_cell_topic = binarized_topics, general_topic_thr = 0.2
+            ).reset_index(name = 'topic').rename(columns = {ct: 'cell_type'}).assign(annotation = ct).iloc[:, [0,5,1,2,3,4]]
+        for ct in cell_type
+    ])
+    topic_annot.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt', sep = '\t', index = False)
 
-    # TODO greatpy
+    # pyGREAT pipeline
+    # convert the binarized topics to a dict of pyRanges objects
+    import pyranges as pr
+    from pycisTopic.pyGREAT import pyGREAT
+    binarized_topics_pr = {topic: pr.PyRanges(chromosomes = peaks.index.str.split(':|-').str[0],
+                                              starts = peaks.index.str.split(':|-').str[1].astype(int),
+                                              ends = peaks.index.str.split(':|-').str[2].astype(int))
+                           for topic, peaks in binarized_topics.items()}
+    topics_pygreat = pyGREAT(binarized_topics_pr, species = 'hg38')
+    # returns a dict {Topic i: {ontology: pd.DataFrame()}}
+    topics_pygreat_df = pd.concat([
+        pd.concat([df.assign(ontology = ontology) for ontology, df in topic_dict.items()]
+        ).assign(topic = topic) for topic, topic_dict in topics_pygreat.items()])
+    topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
+
+    # pycisTarget pipeline
+    # TODO missing required motif collection database
 # endregion
 
 # region: scOpen pipeline
