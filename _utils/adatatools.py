@@ -52,9 +52,11 @@ def check_atac(dataset = None, prefix = None, adata = None):
             if var_names.str.contains('ENSG').any():
                 log.warn('Gene names in var_names appear to be Ensembl IDs, press Ctrl+C to abort if input dataset is not ATAC-seq', calling_file = 'check_atac')
 
-    genome_build = input('Enter genome build (hg19 or hg38): (Default: hg38)').strip()
+    genome_build = input('Enter genome build (hg19 or hg38): (Default: hg38) ').strip()
     while genome_build not in ['hg19', 'hg38', '']:
-        genome_build = input('Invalid genome build, please enter hg19 or hg38: ').strip()
+        genome_build_tmp = input('Not a human genome build, please enter hg19 or hg38, or re-enter the same genome build to confirm: ').strip()
+        if genome_build_tmp == genome_build: break
+        else: genome_build = genome_build_tmp
     genome_build = genome_build or 'hg38'
     lift_to = 'hg38' if genome_build == 'hg19' else 'hg19'
 
@@ -73,7 +75,7 @@ def check_atac(dataset = None, prefix = None, adata = None):
             chrom = 'chr' + adata.var[chrom_col].astype(str).str.replace('chr', '', regex = False).str.strip().replace(
                 {'23': 'chrX', '24': 'chrY', '25': 'chrM', '26': 'chrM', 'MT': 'chrM'} |
                 {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
-                )
+                ) # preserve non-standard chromosome names and convert standard chromosomes to chr1-chrM
             start = adata.var[start_col].astype(int)
             end = adata.var[end_col].astype(int)
         else:
@@ -85,6 +87,28 @@ def check_atac(dataset = None, prefix = None, adata = None):
                     )
                 start = h5py_get_col(file['var'][start_col]).astype(int)
                 end = h5py_get_col(file['var'][end_col]).astype(int)
+
+    # if not a human genome build, just move columns and skip liftover
+    if genome_build not in ['hg19', 'hg38']:
+        new_var_names = chrom + ':' + start.astype(str) + '-' + end.astype(str)
+        if adata is not None:
+            adata.var.drop(columns = [chrom_col, start_col, end_col], inplace = True)
+            adata.var.insert(0, 'chrom', chrom)
+            adata.var.insert(1, f'start_{genome_build}', start)
+            adata.var.insert(2, f'end_{genome_build}', end)
+            adata.var_names = new_var_names
+            adata.uns['atac_check_complete'] = True
+        else:
+            with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r+') as file:
+                var = file['var']
+                var.move(chrom_col, 'chrom')
+                var.move(start_col, f'start_{genome_build}')
+                var.move(end_col, f'end_{genome_build}')
+                var.attrs['column-order'] = np.array(['chrom', f'start_{genome_build}', f'end_{genome_build}'] + 
+                    [x for x in var.attrs['column-order'] if x not in [chrom_col, start_col, end_col]]).astype(object) # string as objects
+                var[var.attrs['_index']][:] = new_var_names.values.astype(bytes).astype(object) # bytes stored as objects
+                file['uns'].create_dataset('atac_check_complete', data = True, dtype = 'bool')
+        return True
 
     coords = dict(hg19 = dict(), hg38 = dict())
     coords[genome_build]['chrom'] = chrom
