@@ -61,32 +61,46 @@ def check_atac(dataset = None, prefix = None, adata = None):
     lift_to = 'hg38' if genome_build == 'hg19' else 'hg19'
 
     # create chromosome, start and end columns if the var_names satisfy the format chr:start-end, otherwise prompt user to select the columns and read from file
-    if var_names.str.match(r'chr[0-9XYM]+:[0-9]+-[0-9]+').mean() > 0.9: # allow for some peaks in other scaffolds e.g. KI270713.1
+    coord_cols = select_metadata_cols(
+        dataset = dataset, prefix = prefix, adata = adata,
+        axis = 'var', input_string = 'chromosome, start and end, in that order', default = ['Chrom','Start','End'])
+    if len (coord_cols) == 3: chrom_col, start_col, end_col = coord_cols
+    elif var_names.str.match(r'chr[0-9XYM]+:[0-9]+-[0-9]+').mean() > 0.9: # allow for some peaks in other scaffolds e.g. KI270713.1
         chrom = var_names.str.split(':|-', expand = True)[0]
         start = var_names.str.split(':|-', expand = True)[1].astype(int)
         end = var_names.str.split(':|-', expand = True)[2].astype(int)
-    else:
-        chrom_col, start_col, end_col = select_metadata_cols(
-            dataset = dataset, prefix = prefix, adata = adata,
-            axis = 'var', input_string = 'chromosome, start and end, in that order', default = ['Chrom','Start','End'])
-
-        # load chromosome, start and end coordinates from adata or h5ad file
+        chrom_col, start_col, end_col = 'chrom', f'start_{genome_build}', f'end_{genome_build}'
         if adata is not None:
-            chrom = 'chr' + adata.var[chrom_col].astype(str).str.replace('chr', '', regex = False).str.strip().replace(
-                {'23': 'chrX', '24': 'chrY', '25': 'chrM', '26': 'chrM', 'MT': 'chrM'} |
-                {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
-                ) # preserve non-standard chromosome names and convert standard chromosomes to chr1-chrM
-            start = adata.var[start_col].astype(int)
-            end = adata.var[end_col].astype(int)
+            adata.var.insert(0, chrom_col, chrom)
+            adata.var.insert(1, start_col, start)
+            adata.var.insert(2, end_col, end)
         else:
-            with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
-                chrom = h5py_get_col(file['var'][chrom_col])
-                chrom = pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
-                    {'23': 'chrX', '24': 'chrY', '25': 'chrXY', '26': 'chrM', 'MT': 'chrM'} |
-                    {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
-                    )
-                start = h5py_get_col(file['var'][start_col]).astype(int)
-                end = h5py_get_col(file['var'][end_col]).astype(int)
+            with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r+') as file:
+                var = file['var']
+                var.create_dataset(chrom_col, data = chrom.values.astype(bytes).astype(object), dtype = 'object')
+                var.create_dataset(start_col, data = start.values, dtype = 'int64')
+                var.create_dataset(end_col, data = end.values, dtype = 'int64')
+                var.attrs['column-order'] = np.array([chrom_col, start_col, end_col] + 
+                    [x for x in var.attrs['column-order'] if x not in [chrom_col, start_col, end_col]]).astype(object) # string as objects
+    else: log.error('Cannot find chromosome, start and end columns in var_names or var metadata, please check your input dataset', calling_file = 'check_atac')
+
+    # load chromosome, start and end coordinates from adata or h5ad file
+    if adata is not None:
+        chrom = 'chr' + adata.var[chrom_col].astype(str).str.replace('chr', '', regex = False).str.strip().replace(
+            {'23': 'chrX', '24': 'chrY', '25': 'chrM', '26': 'chrM', 'MT': 'chrM'} |
+            {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
+            ) # preserve non-standard chromosome names and convert standard chromosomes to chr1-chrM
+        start = adata.var[start_col].astype(int)
+        end = adata.var[end_col].astype(int)
+    else:
+        with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
+            chrom = h5py_get_col(file['var'][chrom_col])
+            chrom = pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
+                {'23': 'chrX', '24': 'chrY', '25': 'chrXY', '26': 'chrM', 'MT': 'chrM'} |
+                {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
+                )
+            start = h5py_get_col(file['var'][start_col]).astype(int)
+            end = h5py_get_col(file['var'][end_col]).astype(int)
 
     # if not a human genome build, just move columns and skip liftover
     if genome_build not in ['hg19', 'hg38']:
