@@ -337,5 +337,4 @@ if __name__ == '__main__':
     elif len(args.scopen_components) == 1: args.scopen_components = [args.scopen_components[0]]
     else: log.error('Invalid format for --scopen_components, please provide either a single integer or three integers for start, stop, step')
     log.splash(args)
-    log.splash(args)
     main(args)

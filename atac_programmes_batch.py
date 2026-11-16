@@ -58,7 +58,7 @@ def main(args):
             cmds = []
             for i in (incomplete := check_cistopic_complete(dataset, prefix, niter = args.niter,
                 n_components = range(args.cistopic_components[0], args.cistopic_components[1]+1, args.cistopic_components[2])
-                ) if len(args.cistopic_components) == 3 else [args.cistopic_components]):
+                ) if len(args.cistopic_components) == 3 else [args.cistopic_components[0]]):
                 cmds.append(cmd + f' --cistopic --worker {i}')
             if len(incomplete) == 0:
                 cmds.append(cmd + f' --cistopic --worker 0')
