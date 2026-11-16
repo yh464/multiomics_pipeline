@@ -171,7 +171,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
 
     topic_annot = pd.concat([
         topic_annotation(cistopic_obj, annot_var = ct, binarized_cell_topic = binarized_topics, general_topic_thr = 0.2
-            ).reset_index(name = 'topic').rename(columns = {ct: 'cell_type'}).assign(annotation = ct).iloc[:, [0,5,1,2,3,4]]
+            ).reset_index(names = 'topic').rename(columns = {ct: 'cell_type'}).assign(annotation = ct).iloc[:, [0,5,1,2,3,4]]
         for ct in cell_type
     ])
     topic_annot.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt', sep = '\t', index = False)
