@@ -71,14 +71,18 @@ def check_atac(dataset = None, prefix = None, adata = None):
         # load chromosome, start and end coordinates from adata or h5ad file
         if adata is not None:
             chrom = 'chr' + adata.var[chrom_col].astype(str).str.replace('chr', '', regex = False).str.strip().replace(
-                {'23': 'X', '24': 'Y', '25': 'M', '26': 'M', 'MT': 'M'})
+                {'23': 'chrX', '24': 'chrY', '25': 'chrM', '26': 'chrM', 'MT': 'chrM'} |
+                {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
+                )
             start = adata.var[start_col].astype(int)
             end = adata.var[end_col].astype(int)
         else:
             with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as file:
                 chrom = h5py_get_col(file['var'][chrom_col])
-                chrom = 'chr' + pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
-                    {'23': 'X', '24': 'Y', '25': 'XY', '26': 'M', 'MT': 'M'})
+                chrom = pd.Series(chrom).str.replace('chr', '', regex = False).str.strip().replace(
+                    {'23': 'chrX', '24': 'chrY', '25': 'chrXY', '26': 'chrM', 'MT': 'chrM'} |
+                    {f'{i}': f'chr{i}' for i in list(range(1, 23)) + ['X', 'Y', 'M']}
+                    )
                 start = h5py_get_col(file['var'][start_col]).astype(int)
                 end = h5py_get_col(file['var'][end_col]).astype(int)
 
