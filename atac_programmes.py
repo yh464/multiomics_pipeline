@@ -95,21 +95,6 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     cistopic_obj = create_cistopic_object(X, cell_names, peak_names)
     cistopic_obj.add_cell_data(adata.obs)
 
-    # identify DARs for each cell type annotation
-    if not all([os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') for ct in cell_type]) or force:
-        from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
-        log.log(f'Identifying differentially accessible regions for {dataset} {prefix}', calling_file = 'run_cistopic')
-        imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
-        norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
-        hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
-            n_bins = 20, n_top_features = None, plot = False)
-        for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
-            if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
-            log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
-            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = n_cpu, split_pattern = '-')
-            with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
-    dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
-
     # run cistopic model
     if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl') or force:
         log.log(f'Running cistopic model for {dataset} {prefix} with {n_topics} topics', calling_file = 'run_cistopic')
@@ -189,6 +174,21 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     cell_topic = cell_topic.div(cell_topic.sum(axis = 1), axis = 0)
     cell_topic.to_parquet(f'{outdir}/{prefix}.cistopic.k_{k_optim}.cell_topic.parquet', compression = 'gzip')
     cistopic_obj.add_LDA_model(best_model)
+
+    # identify DARs for each cell type annotation
+    if not all([os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') for ct in cell_type]) or force:
+        from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
+        log.log(f'Identifying differentially accessible regions for {dataset} {prefix}', calling_file = 'run_cistopic')
+        imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
+        norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
+        hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
+            n_bins = 20, n_top_features = None, plot = False)
+        for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
+            if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
+            log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
+            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = n_cpu, split_pattern = '-')
+            with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
+    dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
 
     # binarise topics and annotate topics with cell types
     from pycisTopic.topic_binarization import binarize_topics
