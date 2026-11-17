@@ -97,7 +97,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     # identify DARs for each cell type annotation
     if not all([os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') for ct in cell_type]) or force:
-        from pycistopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
+        from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
         log.log(f'Identifying differentially accessible regions for {dataset} {prefix}', calling_file = 'run_cistopic')
         imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
