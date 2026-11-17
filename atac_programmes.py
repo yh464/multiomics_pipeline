@@ -13,7 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
-import os, time, pickle
+import os, time, pickle, glob
 from fnmatch import fnmatch
 from multiprocessing import cpu_count, Pool
 from tqdm import tqdm
@@ -62,15 +62,21 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         else:
             k_selection_metrics = pd.read_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', sep = '\t')
             k_optim = _cistopic_select_k(k_selection_metrics)
-        if os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl') and not force:
+        if os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl') and \
+            os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl') and \
+            not force:
             log.log(f'Binarised topics for {dataset} {prefix} already exist, skipping cistopic model fitting', calling_file = 'run_cistopic')
+            log.log(f'Loading binarised topics from {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', calling_file = 'run_cistopic')
             with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'rb') as f: binarised_topics = pickle.load(f)
-            return binarised_topics
+            with open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb') as f: dar = pickle.load(f)
+            return binarised_topics, dar
 
     import scanpy as sc
     from scipy import sparse
     from pycisTopic.cistopic_class import create_cistopic_object
     from pycisTopic.lda_models import run_cgs_models_mallet
+    from _utils.slurm import get_slurm_config
+    n_cpu, mem = get_slurm_config() # memory in MB
     
     n_topics = n_components[worker]
     if len(n_components) == 1 and niter < 200:
@@ -89,12 +95,24 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     cistopic_obj = create_cistopic_object(X, cell_names, peak_names)
     cistopic_obj.add_cell_data(adata.obs)
 
+    # identify DARs for each cell type annotation
+    if not all([os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') for ct in cell_type]) or force:
+        from pycistopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
+        log.log(f'Identifying differentially accessible regions for {dataset} {prefix}', calling_file = 'run_cistopic')
+        imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
+        norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
+        hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
+            n_bins = 20, n_top_features = None, plot = False)
+        for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
+            if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
+            log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
+            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = n_cpu, split_pattern = '-')
+            with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
+    dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
+
     # run cistopic model
     if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl') or force:
         log.log(f'Running cistopic model for {dataset} {prefix} with {n_topics} topics', calling_file = 'run_cistopic')
-
-        from _utils.slurm import get_slurm_config
-        n_cpu, mem = get_slurm_config() # memory in MB
         os.environ['MALLET_MEMORY'] = f'{mem*0.9/1024:.0f}G'
         
         models = run_cgs_models_mallet(cistopic_obj, n_topics = [n_topics], n_iter = niter, n_cpu = n_cpu,
@@ -106,15 +124,12 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     if len(check_cistopic_complete(dataset, prefix, n_components = n_components)) > 0:
         log.log('Waiting for other workers to finish cistopic model fitting', calling_file = 'run_cistopic')
-        return
+        return None, None
 
     # if all workers have finished, clean cache files that cannot be reused
-    try:
-        os.system(f'rm {outdir}/temp/*state.mallet.gz')
-        os.system(f'rm {outdir}/temp/*inferencer.mallet')
-        os.system(f'rm {outdir}/temp/*doctopics.txt')
-        os.system(f'rm {outdir}/temp/*topickeys.txt')
-    except: pass # ignore if files are already removed
+    for x in glob.glob(f'{outdir}/temp/*state.mallet.gz') + glob.glob(f'{outdir}/temp/*inferencer.mallet') + \
+        glob.glob(f'{outdir}/temp/*doctopics.txt') + glob.glob(f'{outdir}/temp/*topickeys.txt'):
+        if os.path.isfile(x): os.remove(x)
 
     # compare models
     if len(n_components) > 1:
@@ -198,33 +213,43 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         ])
         topic_annot.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt', sep = '\t', index = False)
 
-def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), worker = 0, niter = 100, 
+    return binarised_topics, dar
+
+def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), worker = 0, niter = 100, top = 3000,
     alpha = 50, eta = 0.1, mallet = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet', downsample = -1,
     cell_type = ['cell_type'], embedding = ['X_umap', 'X_tsne'], time_key = ['pseudotime', 'age', 'time'],
     seed = 19260817, force = False, savedir = None):
 
-    binarised_topics = _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = n_components, worker = worker, niter = niter,
+    binarised_topics, dar = _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = n_components, worker = worker, niter = niter,
         alpha = alpha, eta = eta, mallet = mallet, downsample = downsample, cell_type = cell_type, embedding = embedding, time_key = time_key, 
         seed = seed, force = force, savedir = savedir)
     if binarised_topics is None: return
 
+    # binarise topics using top peaks if requested
+    log.log(f'Binarising topics using top {top} peaks for {dataset} {prefix}', calling_file = 'run_cistopic')
+    if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{n_components[worker]}.binarised_topics.top{top}.pkl') or force):
+        peak_scores = pd.read_table(f'{outdir}/{prefix}.cistopic.k_{n_components[worker]}.topic_loadings.txt.gz', index_col = 0)
+        with open(f'{outdir}/{prefix}.cistopic.k_{n_components[worker]}.binarised_topics.top{top}.pkl', 'wb') as f:
+            pickle.dump({topic: peaks.sort_values(by = topic, ascending = False).head(top) for topic, peaks in peak_scores.items()}, f)
+
     # pyGREAT pipeline
     # convert the binarized topics to a dict of pyRanges objects
+    # currently not implemented because the pyGREAT server http://great.stanford.edu/public/cgi-bin/greatWeb.php is down
     import pyranges as pr
     from pycisTopic.pyGREAT import pyGREAT
     binarised_topics_pr = {topic: pr.PyRanges(chromosomes = peaks.index.str.split(':|-').str[0],
                                               starts = peaks.index.str.split(':|-').str[1].astype(int),
                                               ends = peaks.index.str.split(':|-').str[2].astype(int))
                            for topic, peaks in binarised_topics.items()}
-    topics_pygreat = pyGREAT(binarised_topics_pr, species = 'hg38')
-    # returns a dict {Topic i: {ontology: pd.DataFrame()}}
-    topics_pygreat_df = pd.concat([
-        pd.concat([df.assign(ontology = ontology) for ontology, df in topic_dict.items()]
-        ).assign(topic = topic) for topic, topic_dict in topics_pygreat.items()])
-    topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
+    # topics_pygreat = pyGREAT(binarised_topics_pr, species = 'hg38')
+    # # returns a dict {Topic i: {ontology: pd.DataFrame()}}
+    # topics_pygreat_df = pd.concat([
+    #     pd.concat([df.assign(ontology = ontology) for ontology, df in topic_dict.items()]
+    #     ).assign(topic = topic) for topic, topic_dict in topics_pygreat.items()])
+    # topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
 
     # pycisTarget pipeline
-    # TODO missing required motif collection database
+    
 # endregion
 
 # region: scOpen pipeline
@@ -316,11 +341,11 @@ def main(args):
         run_cistopic(args.dataset, args.prefix, cistopic_outdir, n_components = args.cistopic_components, worker = args.worker, niter = args.niter,
             alpha = args.cistopic_alpha, eta = args.cistopic_eta, mallet = args.mallet,
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817, downsample = args.downsample,
-            force = args.force, savedir = args.magma_out if args.magma else None)
+            force = args.force, savedir = args.magma_out if args.magma else None, top = args.top)
     if args.scopen:
         run_scopen(args.dataset, args.prefix, scopen_outdir, n_components = args.scopen_components, worker = args.worker,
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817,
-            force = args.force, savedir = args.magma_out if args.magma else None)
+            force = args.force, savedir = args.magma_out if args.magma else None, top = args.top)
 
 def add_cmd_args(parser):
     parser.add_argument('--cistopic', action = 'store_true', help = 'Run cistopic to identify gene programmes')
@@ -329,7 +354,7 @@ def add_cmd_args(parser):
     parser.add_argument('--cistopic_alpha', type = float, default = 50, help = 'Alpha parameter for cistopic (default: 50)')
     parser.add_argument('--cistopic_eta', type = float, default = 0.1, help = 'Eta parameter for cistopic (default: 0.1)')
     parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet/bin/mallet',
-        help = 'Path to mallet binary for cistopic. default: /rds/project/rds-Nl99R8pHODQ/toolbox/mallet')
+        help = 'Path to mallet binary for cistopic. (default: /rds/project/rds-Nl99R8pHODQ/toolbox/mallet)')
 
     parser.add_argument('--scopen', action = 'store_true', help = 'Run scOpen to identify gene programmes')
     parser.add_argument('--scopen_components', type = int, nargs = '+', default = [25, 500, 25],
@@ -342,9 +367,11 @@ def add_cmd_args(parser):
         help = '''Categorical factors in adata.obs that denote the cell type. 
         Only the first is used for Spectra decomposition and pseudotime regression plots.
         All factors are used for factor importance scoring
-        (default: Type_updated)''')
+        (default: cell_type)''')
     parser.add_argument('--embedding', type = str, nargs = '*', default = ['X_umap', 'X_tsne'],
-        help = 'Embedding representations in adata.obsm to use for factor embedding plots (default: X_umap X_tsne)')
+        help = 'Embedding representations in adata.obsm to use for factor embedding plots (default: X_umap, X_tsne)')
+    parser.add_argument('--top', type = int, default = 3000, 
+        help = 'Number of top peaks to use when binarising factors (default: 3000, set --top 0 to disable)')
     parser.add_argument('--time_key', type = str, nargs = '*', default = ['pseudotime', 'age', 'time'],
         help = 'Column names in adata.obs that denote time-related variables to use for pseudotime regression plots (default: pseudotime age time)')
     parser.add_argument('--magma', action = 'store_true', help = 'Format output for MAGMA GSEA')
