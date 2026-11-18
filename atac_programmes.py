@@ -186,7 +186,8 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
             log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
-            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = n_cpu, split_pattern = '-')
+            os.environ['RAY_memory_usage_threshold'] = f'{mem*0.99/1024:.0f}G'
+            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = int(n_cpu/2), split_pattern = '-')
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
     dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
 
