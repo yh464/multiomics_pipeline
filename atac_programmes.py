@@ -245,7 +245,7 @@ def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     if not os.path.isfile(topics_outfile) or force:
         topics_results = {
             cisTarget(
-                region_set = peaks, name = f'{prefix}_k{len(binarised_topics_pr)}_{topic}', species = species,
+                region_set = peaks, name = topic, species = species,
                 auc_threshold = auc_threshold, nes_threshold = nes_threshold, rank_threshold = rank_threshold, path_to_motif_annotations = motif_annot_path,
                 annotation_version = annot_version, annotation_to_use = annotation_to_use, motif_similarity_fdr = motif_similarity_fdr,
                 orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
@@ -260,7 +260,7 @@ def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     if not os.path.isfile(dar_outfile) or force:
         dar_results = {
             cisTarget(
-                region_set = peaks, name = f'{prefix}_dar_{cell_type}_{ct}', species = species,
+                region_set = peaks, name = ct, species = species,
                 auc_threshold = auc_threshold, nes_threshold = nes_threshold, rank_threshold = rank_threshold, path_to_motif_annotations = motif_annot_path,
                 annotation_version = annot_version, annotation_to_use = annotation_to_use, motif_similarity_fdr = motif_similarity_fdr,
                 orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
@@ -297,7 +297,7 @@ def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     if not os.path.isfile(topics_outfile) or force:
         topics_results = {
             DEM(
-                foreground_regions = peaks, background_regions = background_pr, name = f'{prefix}_k{len(binarised_topics_pr)}_{topic}', 
+                foreground_regions = peaks, background_regions = background_pr, name = topic, 
                 species = species, adjpval_thr = adjpval_thr, log2fc_thr = log2fc_thr, mean_fg_thr = mean_fg_thr, motif_hit_thr = motif_hit_thr,
                 path_to_motif_annotations = motif_annot_path, annotation_version = annot_version, annotation_to_use = annotation_to_use,
                 motif_similarity_fdr = motif_similarity_fdr, orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
@@ -312,7 +312,7 @@ def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     if not os.path.isfile(dar_outfile) or force:
         dar_results = {
             DEM(
-                foreground_regions = peaks, background_regions = background_pr, name = f'{prefix}_dar_{cell_type}_{ct}', 
+                foreground_regions = peaks, background_regions = background_pr, name = ct, 
                 species = species, adjpval_thr = adjpval_thr, log2fc_thr = log2fc_thr, mean_fg_thr = mean_fg_thr, motif_hit_thr = motif_hit_thr,
                 path_to_motif_annotations = motif_annot_path, annotation_version = annot_version, annotation_to_use = annotation_to_use,
                 motif_similarity_fdr = motif_similarity_fdr, orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
