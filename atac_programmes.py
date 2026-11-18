@@ -69,7 +69,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             log.log(f'Loading binarised topics from {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', calling_file = 'run_cistopic')
             with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'rb') as f: binarised_topics = pickle.load(f)
             with open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb') as f: dar = pickle.load(f)
-            return binarised_topics, dar
+            return binarised_topics, dar, k_optim
 
     import scanpy as sc
     from scipy import sparse
@@ -109,7 +109,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     if len(check_cistopic_complete(dataset, prefix, n_components = n_components)) > 0:
         log.log('Waiting for other workers to finish cistopic model fitting', calling_file = 'run_cistopic')
-        return None, None
+        return None, None, None
 
     # if all workers have finished, clean cache files that cannot be reused
     for x in glob.glob(f'{outdir}/temp/*state.mallet.gz') + glob.glob(f'{outdir}/temp/*inferencer.mallet') + \
@@ -185,6 +185,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
         hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
             n_bins = 20, n_top_features = None, plot = False)
+        log.log(f'Found {len(hvp)} highly variable peaks for {dataset} {prefix}', calling_file = 'run_cistopic')
         for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
             log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
@@ -217,23 +218,23 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         ])
         topic_annot.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt', sep = '\t', index = False)
 
-    return binarised_topics, dar
+    return binarised_topics, dar, k_optim
 
 def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), worker = 0, niter = 100, top = 3000,
     alpha = 50, eta = 0.1, mallet = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet', downsample = -1,
     cell_type = ['cell_type'], embedding = ['X_umap', 'X_tsne'], time_key = ['pseudotime', 'age', 'time'],
     seed = 19260817, force = False, savedir = None):
 
-    binarised_topics, dar = _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = n_components, worker = worker, niter = niter,
+    binarised_topics, dar, k_optim = _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = n_components, worker = worker, niter = niter,
         alpha = alpha, eta = eta, mallet = mallet, downsample = downsample, cell_type = cell_type, embedding = embedding, time_key = time_key, 
         seed = seed, force = force, savedir = savedir)
     if binarised_topics is None: return
 
     # binarise topics using top peaks if requested
     log.log(f'Binarising topics using top {top} peaks for {dataset} {prefix}', calling_file = 'run_cistopic')
-    if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{n_components[worker]}.binarised_topics.top{top}.pkl') or force):
-        peak_scores = pd.read_table(f'{outdir}/{prefix}.cistopic.k_{n_components[worker]}.topic_loadings.txt.gz', index_col = 0)
-        with open(f'{outdir}/{prefix}.cistopic.k_{n_components[worker]}.binarised_topics.top{top}.pkl', 'wb') as f:
+    if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl') or force):
+        peak_scores = pd.read_table(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', index_col = 0)
+        with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', 'wb') as f:
             pickle.dump({topic: peaks.sort_values(by = topic, ascending = False).head(top) for topic, peaks in peak_scores.items()}, f)
 
     # pyGREAT pipeline
