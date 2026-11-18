@@ -13,11 +13,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
-import os, time, pickle, glob
+import os, time, pickle, glob, re
 from fnmatch import fnmatch
 from multiprocessing import cpu_count, Pool
 from tqdm import tqdm
 from _utils.adatatools import subset_h5ad, downsample_adata
+from _utils.slurm import get_slurm_config
+n_cpu, mem = get_slurm_config() # memory in MB
 
 from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
 from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
@@ -67,6 +69,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             not force:
             log.log(f'Binarised topics for {dataset} {prefix} already exist, skipping cistopic model fitting', calling_file = 'run_cistopic')
             log.log(f'Loading binarised topics from {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', calling_file = 'run_cistopic')
+            log.log(f'Loading DARs from {outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', calling_file = 'run_cistopic')
             with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'rb') as f: binarised_topics = pickle.load(f)
             with open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb') as f: dar = pickle.load(f)
             return binarised_topics, dar, k_optim
@@ -75,8 +78,6 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     from scipy import sparse
     from pycisTopic.cistopic_class import create_cistopic_object
     from pycisTopic.lda_models import run_cgs_models_mallet
-    from _utils.slurm import get_slurm_config
-    n_cpu, mem = get_slurm_config() # memory in MB
     
     n_topics = n_components[worker]
     if len(n_components) == 1 and niter < 200:
@@ -190,7 +191,8 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
             log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
             os.environ['RAY_memory_usage_threshold'] = '0.99'
-            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = max(int(n_cpu/4), 1), split_pattern = '-',
+            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, 
+                variable = ct, n_cpu = max(int(n_cpu/2), 1), split_pattern = '-',
                 _temp_dir = '/rds/user/yh464/hpc-work/temp/ray') # must use a short path name as ray has a limit of 107 bytes for the tmpdir
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
     dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
@@ -220,8 +222,10 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     return binarised_topics, dar, k_optim
 
-def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), worker = 0, niter = 100, top = 3000,
-    alpha = 50, eta = 0.1, mallet = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet', downsample = -1,
+def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), 
+    worker = 0, niter = 100, top = 3000, downsample = -1, alpha = 50, eta = 0.1, 
+    scenic_db = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases', 
+    mallet = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet',
     cell_type = ['cell_type'], embedding = ['X_umap', 'X_tsne'], time_key = ['pseudotime', 'age', 'time'],
     seed = 19260817, force = False, savedir = None):
 
@@ -235,17 +239,25 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl') or force):
         peak_scores = pd.read_table(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', index_col = 0)
         with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', 'wb') as f:
-            pickle.dump({topic: peaks.sort_values(by = topic, ascending = False).head(top) for topic, peaks in peak_scores.items()}, f)
+            pickle.dump({topic: peaks.sort_values(ascending = False).head(top) for topic, peaks in peak_scores.items()}, f)
+
+    # convert the binarized topics to a dict of pyRanges objects
+    import pyranges as pr
+    binarised_topics_pr = {topic: pr.PyRanges(
+        chromosomes = peaks.index.str.split(':|-').str[0],
+        starts = peaks.index.str.split(':|-').str[1].astype(int),
+        ends = peaks.index.str.split(':|-').str[2].astype(int))
+        for topic, peaks in binarised_topics.items()}
+    dar_pr = {re.sub('[^A-Za-z0-9]+', '_', ct): pr.PyRanges(
+        chromosomes = peaks.index.str.split(':|-').str[0],
+        starts = peaks.index.str.split(':|-').str[1].astype(int),
+        ends = peaks.index.str.split(':|-').str[2].astype(int)
+    ) for ct, peaks in dar.items()}
 
     # pyGREAT pipeline
     # convert the binarized topics to a dict of pyRanges objects
     # currently not implemented because the pyGREAT server http://great.stanford.edu/public/cgi-bin/greatWeb.php is down
-    import pyranges as pr
-    from pycisTopic.pyGREAT import pyGREAT
-    binarised_topics_pr = {topic: pr.PyRanges(chromosomes = peaks.index.str.split(':|-').str[0],
-                                              starts = peaks.index.str.split(':|-').str[1].astype(int),
-                                              ends = peaks.index.str.split(':|-').str[2].astype(int))
-                           for topic, peaks in binarised_topics.items()}
+    # from pycisTopic.pyGREAT import pyGREAT
     # topics_pygreat = pyGREAT(binarised_topics_pr, species = 'hg38')
     # # returns a dict {Topic i: {ontology: pd.DataFrame()}}
     # topics_pygreat_df = pd.concat([
@@ -254,7 +266,17 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), wor
     # topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
 
     # pycisTarget pipeline
-    
+    from scenicplus.wrappers.run_pycistarget import run_pycistarget
+    log.log(f'Running pycisTarget for {dataset} {prefix} using DARs based on {cell_type[0]}', calling_file = 'run_cistopic')
+    topics_pycistarget = run_pycistarget(
+        binarised_topics_pr, species = 'homo_sapiens', run_without_promoters = True, biomart_host = 'http://www.ensembl.org',
+        ctx_db_path = f'{scenic_db}/hg38_screen_v10_clust.regions_vs_motifs.rankings.feather',
+        dem_db_path = f'{scenic_db}/hg38_screen_v10_clust.regions_vs_motifs.scores.feather',
+        path_to_motif_annotations = f'{scenic_db}/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl',
+        promoter_space = 500, ctx_auc_threshold = 0.005, ctx_nes_threshold = 3.0, ctx_rank_threshold = 0.05,
+        dem_log2fc_thr = 0.5, dem_motif_hit_thr = 3.0, dem_max_bg_regions = 500,
+        annotation_version = 'v10nr_clust', annotation = ['Direct_annot','Orthology_annot'],
+        save_path = outdir, _temp_dir = '/rds/user/yh464/hpc-work/temp', n_cpu = max(int(n_cpu/2), 1))
 # endregion
 
 # region: scOpen pipeline
@@ -344,7 +366,7 @@ def main(args):
     scopen_outdir = os.path.dirname(proj.to_pathname('atac_programmes_scopen', args.dataset, args.prefix))
     if args.cistopic:
         run_cistopic(args.dataset, args.prefix, cistopic_outdir, n_components = args.cistopic_components, worker = args.worker, niter = args.niter,
-            alpha = args.cistopic_alpha, eta = args.cistopic_eta, mallet = args.mallet,
+            alpha = args.cistopic_alpha, eta = args.cistopic_eta, mallet = args.mallet, scenic_db = args.scenic_db,
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817, downsample = args.downsample,
             force = args.force, savedir = args.magma_out if args.magma else None, top = args.top)
     if args.scopen:
@@ -360,6 +382,8 @@ def add_cmd_args(parser):
     parser.add_argument('--cistopic_eta', type = float, default = 0.1, help = 'Eta parameter for cistopic (default: 0.1)')
     parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet/bin/mallet',
         help = 'Path to mallet binary for cistopic. (default: /rds/project/rds-Nl99R8pHODQ/toolbox/mallet)')
+    parser.add_argument('--scenic_db', help = 'SCENIC+ database directory for pycisTarget; KEEP DEFAULT FILE NAMES',
+        default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases')
 
     parser.add_argument('--scopen', action = 'store_true', help = 'Run scOpen to identify gene programmes')
     parser.add_argument('--scopen_components', type = int, nargs = '+', default = [25, 500, 25],
