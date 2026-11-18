@@ -237,7 +237,7 @@ def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     from pycistarget.motif_enrichment_cistarget import cisTargetDatabase, cisTarget
     log.log(f'Creating cisTarget database for {dataset} {prefix}', calling_file = 'run_cistopic')
     ctx_db = cisTargetDatabase(
-        fname = f'{ctx_db_path}/hg38_screen_v10_clust.regions_vs_motifs.rankings.feather',
+        fname = ctx_db_path,
         region_sets = binarised_topics_pr | dar_pr, # merge two dicts when creating the database, but run and save results separately   
     )
 
