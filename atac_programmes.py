@@ -189,7 +189,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
             log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
             os.environ['RAY_memory_usage_threshold'] = '0.99'
-            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = int(n_cpu/2), split_pattern = '-',
+            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = max(int(n_cpu/4), 1), split_pattern = '-',
                 _temp_dir = '/rds/user/yh464/hpc-work/temp/ray') # must use a short path name as ray has a limit of 107 bytes for the tmpdir
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
     dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
