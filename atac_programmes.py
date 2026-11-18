@@ -66,7 +66,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         if os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl') and \
             os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl') and \
             not force:
-            log.log(f'Binarised topics for {dataset} {prefix} already exist, skipping cistopic model fitting', calling_file = 'run_cistopic')
+            log.log(f'Binarised topics for {dataset}/{prefix} already exist, skipping cistopic model fitting', calling_file = 'run_cistopic')
             log.log(f'Loading binarised topics from {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', calling_file = 'run_cistopic')
             log.log(f'Loading DARs from {outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', calling_file = 'run_cistopic')
             with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'rb') as f: binarised_topics = pickle.load(f)
@@ -88,7 +88,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     adata = downsample_adata(adata, group_by = cell_type[0] if len(cell_type) > 0 else None, downsample = downsample, seed = seed)
 
     if adata.shape[0] > 150000:
-        log.warn(f'Number of cells in {dataset} {prefix} is {adata.shape[0]}. This may take a long time to run and may require more memory. Consider downsampling.', calling_file = 'run_cistopic')
+        log.warn(f'Number of cells in {dataset}/{prefix} is {adata.shape[0]}. This may take a long time to run and may require more memory. Consider downsampling.', calling_file = 'run_cistopic')
     X = sparse.csr_matrix(adata.X.T)
     cell_names = adata.obs_names.tolist()
     peak_names = adata.var_names.tolist()
@@ -97,7 +97,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     # run cistopic model
     if not os.path.isfile(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl') or force:
-        log.log(f'Running cistopic model for {dataset} {prefix} with {n_topics} topics', calling_file = 'run_cistopic')
+        log.log(f'Running cistopic model for {dataset}/{prefix} with {n_topics} topics', calling_file = 'run_cistopic')
         os.environ['MALLET_MEMORY'] = f'{mem*0.9/1024:.0f}G'
         
         models = run_cgs_models_mallet(cistopic_obj, n_topics = [n_topics], n_iter = niter, n_cpu = n_cpu,
@@ -118,7 +118,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     # compare models
     if len(n_components) > 1:
-        log.log(f'Comparing cistopic models for {dataset} {prefix}', calling_file = 'run_cistopic')
+        log.log(f'Comparing cistopic models for {dataset}/{prefix}', calling_file = 'run_cistopic')
         model_list = []
         for n_topics in n_components:
             with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'rb') as f: model_list.append(pickle.load(f))
@@ -129,7 +129,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
         # rescale all metrics to [0, 1] for comparison
         k_optim = _cistopic_select_k(k_selection_metrics)
-        log.log(f'Automatically selecting {k_optim} topics for {dataset} {prefix} based on mimno and loglikelihood', calling_file = 'run_cistopic')
+        log.log(f'Automatically selecting {k_optim} topics for {dataset}/{prefix} based on mimno and loglikelihood', calling_file = 'run_cistopic')
         log.warn(f'Please check {outdir}/{prefix}.cistopic.k_selection_metrics.pdf for details', calling_file = 'run_cistopic')
         
         # region: plot scaled metrics, similar to gene_programmes.py lines 423-447
@@ -180,15 +180,15 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     # identify DARs for each cell type annotation
     if not all([os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') for ct in cell_type]) or force:
         from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
-        log.log(f'Identifying differentially accessible regions for {dataset} {prefix}', calling_file = 'run_cistopic')
+        log.log(f'Identifying differentially accessible regions for {dataset}/{prefix}', calling_file = 'run_cistopic')
         imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
         hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
             n_bins = 20, n_top_features = None, plot = False)
-        log.log(f'Found {len(hvp)} highly variable peaks for {dataset} {prefix}', calling_file = 'run_cistopic')
-        for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
+        log.log(f'Found {len(hvp)} highly variable peaks for {dataset}/{prefix}', calling_file = 'run_cistopic')
+        for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset}/{prefix}'):
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
-            log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
+            log.log(f'Identifying DARs for {ct} in {dataset}/{prefix}', calling_file = 'run_cistopic')
             os.environ['RAY_memory_usage_threshold'] = '0.99'
             markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, 
                 variable = ct, n_cpu = max(int(n_cpu/2), 1), split_pattern = '-',
@@ -211,7 +211,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             f.write(f'{topic} ' + ' '.join(peaks.index.tolist()) + '\n')
 
     if not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt') or force:
-        log.log(f'Annotating topics for {dataset} {prefix} with {k_optim} topics', calling_file = 'run_cistopic')
+        log.log(f'Annotating topics for {dataset}/{prefix} with {k_optim} topics', calling_file = 'run_cistopic')
         topic_annot = pd.concat([
             topic_annotation(cistopic_obj, annot_var = ct, binarized_cell_topic = binarised_topics, general_topic_thr = 0.2
                 ).reset_index(names = 'topic').rename(columns = {ct: 'cell_type'}).assign(annotation = ct).iloc[:, [0,5,1,2,3,4]]
@@ -236,13 +236,13 @@ def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
         return topics_results, dar_results
 
     from pycistarget.motif_enrichment_cistarget import cisTargetDatabase, cisTarget
-    log.log(f'Creating cisTarget database for {dataset} {prefix}', calling_file = 'run_cistopic')
+    log.log(f'Creating cisTarget database for {dataset}/{prefix}', calling_file = 'run_cistopic')
     ctx_db = cisTargetDatabase(
         fname = ctx_db_path,
         region_sets = binarised_topics_pr | dar_pr, # merge two dicts when creating the database, but run and save results separately   
     )
 
-    log.log(f'Running pycisTarget for {dataset} {prefix} using {len(binarised_topics_pr)} topics', calling_file = 'run_cistopic')
+    log.log(f'Running pycisTarget for {dataset}/{prefix} using {len(binarised_topics_pr)} topics', calling_file = 'run_cistopic')
     if not os.path.isfile(topics_outfile) or force:
         topics_results = {
             cisTarget(
@@ -257,7 +257,7 @@ def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     else: 
         with open(topics_outfile, 'rb') as f: topics_results = dill.load(f)
 
-    log.log(f'Running pycisTarget for {dataset} {prefix} using {len(dar_pr)} DARs across {cell_type}', calling_file = 'run_cistopic')
+    log.log(f'Running pycisTarget for {dataset}/{prefix} using {len(dar_pr)} DARs across {cell_type}', calling_file = 'run_cistopic')
     if not os.path.isfile(dar_outfile) or force:
         dar_results = {
             cisTarget(
@@ -292,10 +292,10 @@ def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     from pycistarget.motif_enrichment_dem import DEMDatabase, DEM
     log.log(f'Creating DEM database from {dem_db_path}')
     dem_db = DEMDatabase(dem_db_path)
-    _, dem_scores = dem_db.get_scores( # merge all regions to read scores from memory
-        pr.concat(list(binarised_topics_pr.values()) + list(dar_pr.values()) + [background_pr]))
+    # _, dem_scores = dem_db.get_scores( # merge all regions to read scores from memory
+    #     pr.concat(list(binarised_topics_pr.values()) + list(dar_pr.values()) + [background_pr]))
     
-    log.log(f'Running pycisTarget DEM for {dataset} {prefix} using {len(binarised_topics_pr)} topics', calling_file = 'run_cistopic')
+    log.log(f'Running pycisTarget DEM for {dataset}/{prefix} using {len(binarised_topics_pr)} topics', calling_file = 'run_cistopic')
     if not os.path.isfile(topics_outfile) or force:
         topics_results = {
             DEM(
@@ -303,14 +303,14 @@ def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
                 species = species, adjpval_thr = adjpval_thr, log2fc_thr = log2fc_thr, mean_fg_thr = mean_fg_thr, motif_hit_thr = motif_hit_thr,
                 path_to_motif_annotations = motif_annot_path, annotation_version = annot_version, annotation_to_use = annotation_to_use,
                 motif_similarity_fdr = motif_similarity_fdr, orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
-            ).run(dem_db, dem_scores)
+            ).run(dem_db) # run(dem_db, dem_scores) for pycistarget 1.2.0, current version 1.1.0
             for topic, peaks in binarised_topics_pr.items()
         }
         with open(topics_outfile, 'wb') as f: dill.dump(topics_results, f)
     else:
         with open(topics_outfile, 'rb') as f: topics_results = dill.load(f)
 
-    log.log(f'Running pycisTarget DEM for {dataset} {prefix} using {len(dar_pr)} DARs across {cell_type}', calling_file = 'run_cistopic')
+    log.log(f'Running pycisTarget DEM for {dataset}/{prefix} using {len(dar_pr)} DARs across {cell_type}', calling_file = 'run_cistopic')
     if not os.path.isfile(dar_outfile) or force:
         dar_results = {
             DEM(
@@ -340,7 +340,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     if binarised_topics is None: return
 
     # binarise topics using top peaks if requested
-    log.log(f'Binarising topics using top {top} peaks for {dataset} {prefix}', calling_file = 'run_cistopic')
+    log.log(f'Binarising topics using top {top} peaks for {dataset}/{prefix}', calling_file = 'run_cistopic')
     if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl') or force):
         peak_scores = pd.read_table(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', index_col = 0)
         with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', 'wb') as f:
@@ -445,7 +445,7 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     # run NMF decomposition based on TF-IDF transformed matrix
     k = n_components[worker]
     if not os.path.isfile(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt') or force:
-        log.log(f'Running scOpen model for {dataset} {prefix} with {k} components', calling_file = 'run_scopen')
+        log.log(f'Running scOpen model for {dataset}/{prefix} with {k} components', calling_file = 'run_scopen')
         nmf_output = run_nmf((adata_tfidf.X.T, k, 1, 200, 1, seed, 'nndsvd')) # alpha = 1, 200 iters, verbose = 1
         W = pd.DataFrame(nmf_output[0], index = adata_tfidf.var_names, columns = [f'F{i}' for i in range(1, k + 1)])
         H = pd.DataFrame(nmf_output[1], index = [f'F{i}' for i in range(1, k + 1)], columns = adata_tfidf.obs_names)
@@ -453,7 +453,7 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
         W.to_csv(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', sep = '\t')
         H.to_csv(f'{outdir}/temp/{prefix}.scopen.k_{k}.scores.txt', sep = '\t')
         with open(f'{outdir}/temp/{prefix}.scopen.k_{k}.error.txt', 'w') as f: print(error, file = f)
-    log.log(f'scOpen model for {dataset} {prefix} with {k} components completed', calling_file = 'run_scopen')
+    log.log(f'scOpen model for {dataset}/{prefix} with {k} components completed', calling_file = 'run_scopen')
     log.log(f'Output saved to {outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', calling_file = 'run_scopen')
 
     # compare all values of k
@@ -470,7 +470,7 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
         mv_symlink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.weights.txt', f'{outdir}/{prefix}.scopen.k_{kl.knee}.weights.txt')
     if not os.path.islink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.scores.txt'):
         mv_symlink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.scores.txt', f'{outdir}/{prefix}.scopen.k_{kl.knee}.scores.txt')
-    log.log(f'Automatically selecting {kl.knee} components for {dataset} {prefix} based on knee point of reconstruction error', calling_file = 'run_scopen')
+    log.log(f'Automatically selecting {kl.knee} components for {dataset}/{prefix} based on knee point of reconstruction error', calling_file = 'run_scopen')
 # endregion
 
 @log.profile
