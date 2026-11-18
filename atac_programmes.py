@@ -52,7 +52,6 @@ def _cistopic_select_k(k_selection_metrics):
         k_optim = k_selection_metrics_scaled.loc[k_selection_metrics_scaled['score'].idxmax(), 'k']
         return k_optim
 
-
 def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(25, 501, 25), worker = 0, niter = 100, 
     alpha = 50, eta = 0.1, mallet = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet', downsample = -1,
     cell_type = ['cell_type'], embedding = ['X_umap', 'X_tsne'], time_key = ['pseudotime', 'age', 'time'],
@@ -222,6 +221,110 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     return binarised_topics, dar, k_optim
 
+def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, dar_pr, ctx_db_path, motif_annot_path,
+    species = 'homo_sapiens', auc_threshold = 0.005, nes_threshold = 3.0, rank_threshold = 0.05, annot_version = 'v10nr_clust', 
+    annotation_to_use = None, motif_similarity_fdr = 0.001, orthologous_identity_threshold = 0.0, motifs_to_use = None, force = False):
+    # default arguments are copied from pycistarget package default
+
+    import dill
+    topics_outfile = f'{outdir}/{prefix}.cistopic.k_{len(binarised_topics_pr)}.cistarget_ctx.pkl'
+    dar_outfile = f'{outdir}/{prefix}.cistopic.dar.{cell_type}.cistarget_ctx.pkl'
+    if os.path.isfile(topics_outfile) and os.path.isfile(dar_outfile) and not force:
+        with open(topics_outfile, 'rb') as f: topics_results = dill.load(f)
+        with open(dar_outfile, 'rb') as f: dar_results = dill.load(f)
+        return topics_results, dar_results
+
+    from pycistarget.motif_enrichment_cistarget import cisTargetDatabase, cisTarget
+    log.log(f'Creating cisTarget database for {dataset} {prefix}', calling_file = 'run_cistopic')
+    ctx_db = cisTargetDatabase(
+        fname = f'{ctx_db_path}/hg38_screen_v10_clust.regions_vs_motifs.rankings.feather',
+        region_sets = binarised_topics_pr | dar_pr, # merge two dicts when creating the database, but run and save results separately   
+    )
+
+    log.log(f'Running pycisTarget for {dataset} {prefix} using {len(binarised_topics_pr)} topics', calling_file = 'run_cistopic')
+    if not os.path.isfile(topics_outfile) or force:
+        topics_results = {
+            cisTarget(
+                region_set = peaks, name = f'{prefix}_k{len(binarised_topics_pr)}_{topic}', species = species,
+                auc_threshold = auc_threshold, nes_threshold = nes_threshold, rank_threshold = rank_threshold, path_to_motif_annotations = motif_annot_path,
+                annotation_version = annot_version, annotation_to_use = annotation_to_use, motif_similarity_fdr = motif_similarity_fdr,
+                orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
+            ).run_ctx(ctx_db)
+            for topic, peaks in binarised_topics_pr.items()
+        }
+        with open(topics_outfile, 'wb') as f: dill.dump(topics_results, f)
+    else: 
+        with open(topics_outfile, 'rb') as f: topics_results = dill.load(f)
+
+    log.log(f'Running pycisTarget for {dataset} {prefix} using {len(dar_pr)} DARs across {cell_type}', calling_file = 'run_cistopic')
+    if not os.path.isfile(dar_outfile) or force:
+        dar_results = {
+            cisTarget(
+                region_set = peaks, name = f'{prefix}_dar_{cell_type}_{ct}', species = species,
+                auc_threshold = auc_threshold, nes_threshold = nes_threshold, rank_threshold = rank_threshold, path_to_motif_annotations = motif_annot_path,
+                annotation_version = annot_version, annotation_to_use = annotation_to_use, motif_similarity_fdr = motif_similarity_fdr,
+                orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
+            ).run_ctx(ctx_db)
+            for ct, peaks in dar_pr.items()
+        }
+        with open(dar_outfile, 'wb') as f: dill.dump(dar_results, f)
+    else:
+        with open(dar_outfile, 'rb') as f: dar_results = dill.load(f)
+
+    return topics_results, dar_results
+
+def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, dar_pr, background_pr, dem_db_path, motif_annot_path,
+    species = 'homo_sapiens', adjpval_thr = 0.05, log2fc_thr = 1.0, mean_fg_thr = 0.0, motif_hit_thr = None, annot_version = 'v10nr_clust',
+    annotation_to_use = None, motif_similarity_fdr = 0.001, orthologous_identity_threshold = 0.5, motifs_to_use = None, force = False):
+    # default arguments are copied from pycistarget package default
+
+    import dill
+    import pyranges as pr
+    topics_outfile = f'{outdir}/{prefix}.cistopic.k_{len(binarised_topics_pr)}.cistarget_dem.pkl'
+    dar_outfile = f'{outdir}/{prefix}.cistopic.dar.{cell_type}.cistarget_dem.pkl'
+    if os.path.isfile(topics_outfile) and os.path.isfile(dar_outfile) and not force:
+        with open(topics_outfile, 'rb') as f: topics_results = dill.load(f)
+        with open(dar_outfile, 'rb') as f: dar_results = dill.load(f)
+        return topics_results, dar_results
+
+    from pycistarget.motif_enrichment_dem import DEMDatabase, DEM
+    log.log(f'Creating DEM database from {dem_db_path}')
+    dem_db = DEMDatabase(dem_db_path)
+    _, dem_scores = dem_db.get_scores( # merge all regions to read scores from memory
+        pr.concat(list(binarised_topics_pr.values()) + list(dar_pr.values()) + [background_pr]))
+    
+    log.log(f'Running pycisTarget DEM for {dataset} {prefix} using {len(binarised_topics_pr)} topics', calling_file = 'run_cistopic')
+    if not os.path.isfile(topics_outfile) or force:
+        topics_results = {
+            DEM(
+                foreground_regions = peaks, background_regions = background_pr, name = f'{prefix}_k{len(binarised_topics_pr)}_{topic}', 
+                species = species, adjpval_thr = adjpval_thr, log2fc_thr = log2fc_thr, mean_fg_thr = mean_fg_thr, motif_hit_thr = motif_hit_thr,
+                path_to_motif_annotations = motif_annot_path, annotation_version = annot_version, annotation_to_use = annotation_to_use,
+                motif_similarity_fdr = motif_similarity_fdr, orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
+            ).run(dem_db, dem_scores)
+            for topic, peaks in binarised_topics_pr.items()
+        }
+        with open(topics_outfile, 'wb') as f: dill.dump(topics_results, f)
+    else:
+        with open(topics_outfile, 'rb') as f: topics_results = dill.load(f)
+
+    log.log(f'Running pycisTarget DEM for {dataset} {prefix} using {len(dar_pr)} DARs across {cell_type}', calling_file = 'run_cistopic')
+    if not os.path.isfile(dar_outfile) or force:
+        dar_results = {
+            DEM(
+                foreground_regions = peaks, background_regions = background_pr, name = f'{prefix}_dar_{cell_type}_{ct}', 
+                species = species, adjpval_thr = adjpval_thr, log2fc_thr = log2fc_thr, mean_fg_thr = mean_fg_thr, motif_hit_thr = motif_hit_thr,
+                path_to_motif_annotations = motif_annot_path, annotation_version = annot_version, annotation_to_use = annotation_to_use,
+                motif_similarity_fdr = motif_similarity_fdr, orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
+            ).run(dem_db, dem_scores)
+            for ct, peaks in dar_pr.items()
+        }
+        with open(dar_outfile, 'wb') as f: dill.dump(dar_results, f)
+    else:
+        with open(dar_outfile, 'rb') as f: dar_results = dill.load(f)
+
+    return topics_results, dar_results
+
 def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25), 
     worker = 0, niter = 100, top = 3000, downsample = -1, alpha = 50, eta = 0.1, 
     scenic_db = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases', 
@@ -266,17 +369,25 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     # topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
 
     # pycisTarget pipeline
-    from scenicplus.wrappers.run_pycistarget import run_pycistarget
-    log.log(f'Running pycisTarget for {dataset} {prefix} using DARs based on {cell_type[0]}', calling_file = 'run_cistopic')
-    topics_pycistarget = run_pycistarget(
-        binarised_topics_pr, species = 'homo_sapiens', run_without_promoters = True, biomart_host = 'http://www.ensembl.org',
+    topics_ctx, dar_ctx = _run_cistarget_ctx(dataset, prefix, outdir, cell_type[0], binarised_topics_pr, dar_pr,
         ctx_db_path = f'{scenic_db}/hg38_screen_v10_clust.regions_vs_motifs.rankings.feather',
+        motif_annot_path = f'{scenic_db}/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl',
+        force = force) # use default arguments for pycisTarget, which are copied from pycistarget package default
+
+    # background regions are all peaks in the dataset
+    import h5py
+    with h5py.File(proj.to_pathname('raw', dataset, prefix), 'r') as f:
+        var_names = pd.Series(f['var'][f['var'].attrs['_index']][:].astype(str))
+        background_pr = pr.PyRanges(
+            chromosomes = var_names.str.split(':|-').str[0],
+            starts = var_names.str.split(':|-').str[1].astype(int),
+            ends = var_names.str.split(':|-').str[2].astype(int)
+        )
+    topics_dem, dar_dem = _run_cistarget_dem(dataset, prefix, outdir, cell_type[0], binarised_topics_pr, dar_pr, background_pr,
         dem_db_path = f'{scenic_db}/hg38_screen_v10_clust.regions_vs_motifs.scores.feather',
-        path_to_motif_annotations = f'{scenic_db}/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl',
-        promoter_space = 500, ctx_auc_threshold = 0.005, ctx_nes_threshold = 3.0, ctx_rank_threshold = 0.05,
-        dem_log2fc_thr = 0.5, dem_motif_hit_thr = 3.0, dem_max_bg_regions = 500,
-        annotation_version = 'v10nr_clust', annotation = ['Direct_annot','Orthology_annot'],
-        save_path = outdir, _temp_dir = '/rds/user/yh464/hpc-work/temp', n_cpu = max(int(n_cpu/2), 1))
+        motif_annot_path = f'{scenic_db}/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl',
+        force = force) # use default arguments for pycisTarget, which are copied from pycistarget package default
+
 # endregion
 
 # region: scOpen pipeline
