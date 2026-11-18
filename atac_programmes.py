@@ -223,7 +223,8 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
 def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, dar_pr, ctx_db_path, motif_annot_path,
     species = 'homo_sapiens', auc_threshold = 0.005, nes_threshold = 3.0, rank_threshold = 0.05, annot_version = 'v10nr_clust', 
-    annotation_to_use = None, motif_similarity_fdr = 0.001, orthologous_identity_threshold = 0.0, motifs_to_use = None, force = False):
+    annotation_to_use = ['Direct_annot','Motif_similarity_annot','Orthology_annot','Motif_similarity_and_Orthology_annot',], 
+    motif_similarity_fdr = 0.001, orthologous_identity_threshold = 0.0, motifs_to_use = None, force = False):
     # default arguments are copied from pycistarget package default
 
     import dill
@@ -275,7 +276,8 @@ def _run_cistarget_ctx(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
 
 def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, dar_pr, background_pr, dem_db_path, motif_annot_path,
     species = 'homo_sapiens', adjpval_thr = 0.05, log2fc_thr = 1.0, mean_fg_thr = 0.0, motif_hit_thr = None, annot_version = 'v10nr_clust',
-    annotation_to_use = None, motif_similarity_fdr = 0.001, orthologous_identity_threshold = 0.5, motifs_to_use = None, force = False):
+    annotation_to_use = ['Direct_annot','Motif_similarity_annot','Orthology_annot','Motif_similarity_and_Orthology_annot'],
+    motif_similarity_fdr = 0.001, orthologous_identity_threshold = 0.5, motifs_to_use = None, force = False):
     # default arguments are copied from pycistarget package default
 
     import dill
