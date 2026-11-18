@@ -168,11 +168,13 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     # export best model loadings and binarised sets
     with open(f'{outdir}/temp/{prefix}.cistopic.k_{k_optim}.{niter}iter.model.pkl', 'rb') as f:
         best_model = pickle.load(f)
-    best_model.topic_region.T.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', sep = '\t')
-    cell_topic = best_model.cell_topic.T # rows are now cells, columns are topics
-    # normalise such that each cell sums to one
-    cell_topic = cell_topic.div(cell_topic.sum(axis = 1), axis = 0)
-    cell_topic.to_parquet(f'{outdir}/{prefix}.cistopic.k_{k_optim}.cell_topic.parquet', compression = 'gzip')
+    if not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz') or force:
+        best_model.topic_region.T.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', sep = '\t')
+    if not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_scores.txt') or force:
+        cell_topic = best_model.cell_topic.T # rows are now cells, columns are topics
+        # normalise such that each cell sums to one
+        cell_topic = cell_topic.div(cell_topic.sum(axis = 1), axis = 0)
+        cell_topic.to_parquet(f'{outdir}/{prefix}.cistopic.k_{k_optim}.cell_topic.parquet', compression = 'gzip')
     cistopic_obj.add_LDA_model(best_model)
 
     # identify DARs for each cell type annotation
@@ -186,7 +188,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset} {prefix}'):
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
             log.log(f'Identifying DARs for {ct} in {dataset} {prefix}', calling_file = 'run_cistopic')
-            os.environ['RAY_memory_usage_threshold'] = f'{mem*0.99/1024:.0f}G'
+            os.environ['RAY_memory_usage_threshold'] = '0.99'
             markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, variable = ct, n_cpu = int(n_cpu/2), split_pattern = '-')
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
     dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
