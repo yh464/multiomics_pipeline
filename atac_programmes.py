@@ -402,7 +402,7 @@ def check_scopen_complete(dataset, prefix, n_components = range(25, 501, 25)):
             incomplete_idx.append(i)
     return incomplete_idx
 
-def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_peaks = 100000, worker = 0,
+def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_peaks = 100000, top = 3000, worker = 0,
     downsample = -1, cell_type = ['cell_type'], embedding = ['X_umap', 'X_tsne'], time_key = ['pseudotime', 'age', 'time'],
     seed = 19260817, force = False, savedir = None):
 

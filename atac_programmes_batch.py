@@ -44,7 +44,7 @@ def main(args):
         else: selected_time_keys = args.time_key
 
         flags = []
-        for key in ['cistopic_components', 'cistopic_alpha', 'cistopic_eta', 'mallet', 'scopen_components', 'downsample', 'niter']:
+        for key in ['cistopic_components', 'cistopic_alpha', 'cistopic_eta', 'mallet', 'scenic_db','scopen_components', 'downsample', 'niter', 'top']:
             flags.append(f'--{key}')
             if type(getattr(args, key)) in [list, range, tuple]: flags.extend([str(x) for x in getattr(args, key)])
             else: flags.append(str(getattr(args, key)))
