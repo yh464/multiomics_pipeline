@@ -318,7 +318,7 @@ def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
                 species = species, adjpval_thr = adjpval_thr, log2fc_thr = log2fc_thr, mean_fg_thr = mean_fg_thr, motif_hit_thr = motif_hit_thr,
                 path_to_motif_annotations = motif_annot_path, annotation_version = annot_version, annotation_to_use = annotation_to_use,
                 motif_similarity_fdr = motif_similarity_fdr, orthologous_identity_threshold = orthologous_identity_threshold, motifs_to_use = motifs_to_use
-            ).run(dem_db, dem_scores)
+            ).run(dem_db)
             for ct, peaks in dar_pr.items()
         }
         with open(dar_outfile, 'wb') as f: dill.dump(dar_results, f)
