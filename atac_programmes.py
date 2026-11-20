@@ -43,6 +43,7 @@ def check_cistopic_complete(dataset, prefix, n_components = range(25, 501, 25), 
     return incomplete_idx
 
 def _cistopic_select_k(k_selection_metrics):
+        k_selection_metrics = k_selection_metrics.copy()
         k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1
         k_selection_metrics_scaled = k_selection_metrics.copy()
         for col in ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
