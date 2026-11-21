@@ -59,20 +59,24 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     seed = 19260817, force = False, savedir = None):
 
     # check progress
-    if os.path.isfile(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt') or len(n_components) == 1:
-        if len(n_components) == 1: k_optim = n_components[0]
-        else:
-            k_selection_metrics = pd.read_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', sep = '\t')
-            k_optim = _cistopic_select_k(k_selection_metrics)
-        if os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl') and \
-            os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl') and \
-            not force:
-            log.log(f'Binarised topics for {dataset}/{prefix} already exist, skipping cistopic model fitting', calling_file = 'run_cistopic')
-            log.log(f'Loading binarised topics from {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', calling_file = 'run_cistopic')
-            log.log(f'Loading DARs from {outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', calling_file = 'run_cistopic')
-            with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'rb') as f: binarised_topics = pickle.load(f)
-            with open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb') as f: dar = pickle.load(f)
-            return binarised_topics, dar, k_optim
+    if len(n_components) == 1: k_optim = n_components[0]
+    elif os.path.isfile(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt'):
+        k_selection_metrics = pd.read_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', sep = '\t')
+        k_optim = _cistopic_select_k(k_selection_metrics)
+        # new n_components may not overlap with previous runs, need to check all runs are complete
+        if len(check_cistopic_complete(dataset, prefix, n_components = n_components)) > 0: k_optim = None
+    else: k_optim = None
+    
+    if k_optim is not None and \
+        os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl') and \
+        os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl') and \
+        not force:
+        log.log(f'Binarised topics for {dataset}/{prefix} already exist, skipping cistopic model fitting', calling_file = 'run_cistopic')
+        log.log(f'Loading binarised topics from {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', calling_file = 'run_cistopic')
+        log.log(f'Loading DARs from {outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', calling_file = 'run_cistopic')
+        with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'rb') as f: binarised_topics = pickle.load(f)
+        with open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb') as f: dar = pickle.load(f)
+        return binarised_topics, dar, k_optim
 
     import scanpy as sc
     from scipy import sparse
@@ -114,27 +118,32 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
 
     # if all workers have finished, clean cache files that cannot be reused
     for x in glob.glob(f'{outdir}/temp/*state.mallet.gz') + glob.glob(f'{outdir}/temp/*inferencer.mallet') + \
-        glob.glob(f'{outdir}/temp/*doctopics.txt') + glob.glob(f'{outdir}/temp/*topickeys.txt'):
+        glob.glob(f'{outdir}/temp/*doctopics.txt') + glob.glob(f'{outdir}/temp/*topickeys.txt') + glob.glob(f'{outdir}/temp/Topic*.pkl'):
         if os.path.isfile(x): os.remove(x)
 
     # compare models
     if len(n_components) > 1:
         log.log(f'Comparing cistopic models for {dataset}/{prefix}', calling_file = 'run_cistopic')
-        model_list = []
+        metrics_list = []
         for n_topics in n_components:
-            with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'rb') as f: model_list.append(pickle.load(f))
+            with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'rb') as f: 
+                model = pickle.load(f)
+                metrics_list.append([model.metrics.assign(k = model.n_topic).set_index('k')])
 
-        k_selection_metrics = pd.concat([m.metrics.assign(k = m.n_topic) for m in model_list]).set_index('k').sort_index().reset_index()
-        k_selection_metrics.columns = ['k','arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
-        k_selection_metrics.to_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', index = False, sep = '\t')
-
-        # rescale all metrics to [0, 1] for comparison
-        k_optim = _cistopic_select_k(k_selection_metrics)
+        k_selection_metrics = pd.concat(metrics_list).sort_index().reset_index()
+        k_optim = _cistopic_select_k(k_selection_metrics) # need to select k_optim within the range of input n_components
         log.log(f'Automatically selecting {k_optim} topics for {dataset}/{prefix} based on mimno and loglikelihood', calling_file = 'run_cistopic')
         log.warn(f'Please check {outdir}/{prefix}.cistopic.k_selection_metrics.pdf for details', calling_file = 'run_cistopic')
+
+        if os.path.isfile(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt'): # append new metrics to existing file if it exists
+            k_selection_metrics = pd.concat([pd.read_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', sep = '\t'), k_selection_metrics]
+                ).drop_duplicates(subset = 'k').sort_values('k').reset_index(drop = True)
+        k_selection_metrics.columns = ['k','arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
+        k_selection_metrics.to_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', index = False, sep = '\t')
         
         # region: plot scaled metrics, similar to gene_programmes.py lines 423-447
         k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1 # needed for plotting as these metrics are inverted
+        k_selection_metrics = k_selection_metrics.loc[k_selection_metrics.k.isin(n_components)].copy() # only plot the requested n_components
         fig, ax0 = plt.subplots(figsize = (5,2))
         ax1 = ax0.twinx(); ax2 = ax0.twinx(); ax3 = ax0.twinx()
         for plot_ax, stat, label, colour, style in zip(
@@ -146,7 +155,8 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         ):
             plot_ax.plot(k_selection_metrics.k, k_selection_metrics[stat], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
             plot_ax.spines[['top', 'right', 'bottom']].set_visible(False)
-            plot_ax.set_xticks(np.arange(min(n_components), max(n_components)+1, max(4*(n_components[1] - n_components[0]), 5)))
+            plot_ax.set_xticks(np.arange(k_selection_metrics.k.min(), k_selection_metrics.k.max() + 1, 
+                max(int((k_selection_metrics.k.max() - k_selection_metrics.k.min()) / 8), 5))) # max 9 ticks, min gap between ticks = 5
             plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
             plot_ax.yaxis.set_label_position('left')
             plot_ax.yaxis.tick_left()
@@ -176,6 +186,8 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         # normalise such that each cell sums to one
         cell_topic = cell_topic.div(cell_topic.sum(axis = 1), axis = 0)
         cell_topic.to_parquet(f'{outdir}/{prefix}.cistopic.k_{k_optim}.cell_topic.parquet', compression = 'gzip')
+    log.log(f'Region weights are saved to {outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', calling_file = 'run_cistopic')
+    log.log(f'Cell-level scores are saved to {outdir}/{prefix}.cistopic.k_{k_optim}.cell_topic.parquet', calling_file = 'run_cistopic')
     cistopic_obj.add_LDA_model(best_model)
 
     # identify DARs for each cell type annotation
@@ -196,6 +208,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
                 _temp_dir = '/rds/user/yh464/hpc-work/temp/ray') # must use a short path name as ray has a limit of 107 bytes for the tmpdir
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
     dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
+    log.log(f'DARs for {cell_type[0]} in {dataset}/{prefix} are saved to {outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', calling_file = 'run_cistopic')
 
     # binarise topics and annotate topics with cell types
     from pycisTopic.topic_binarization import binarize_topics
@@ -204,12 +217,19 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     # returns a dict of f'Topic {i}': pd.DataFrame(topic_score, index = region_names, columns = [f'Topic {i}'])
     # convert to MAGMA format: Topic_{i} region_1 region_2 ... region_n
     
-    with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'wb') as f: pickle.dump(binarised_topics, f)
+    if not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl') or force:
+        with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 'wb') as f: pickle.dump(binarised_topics, f)
+    log.log(f'Binarised topics for {dataset}/{prefix} with {k_optim} topics are saved to {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.pkl', 
+        calling_file = 'run_cistopic')
 
     with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.txt', 'w') as f:
         for topic, peaks in binarised_topics.items():
             topic = topic.replace('Topic ', 'Topic_')
             f.write(f'{topic} ' + ' '.join(peaks.index.tolist()) + '\n')
+
+            if len(peaks.index) < 1000: log.warn(
+                f'{topic} in {dataset}/{prefix} has only {len(peaks.index)} peaks after binarization, consider using a lower number of topics', 
+                calling_file = 'run_cistopic')
 
     if not os.path.isfile(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt') or force:
         log.log(f'Annotating topics for {dataset}/{prefix} with {k_optim} topics', calling_file = 'run_cistopic')
@@ -219,6 +239,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             for ct in cell_type
         ])
         topic_annot.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt', sep = '\t', index = False)
+        log.log(f'Cell type annotation for binarised topics is saved to {outdir}/{prefix}.cistopic.k_{k_optim}.topic_annotation.txt', calling_file = 'run_cistopic')
 
     return binarised_topics, dar, k_optim
 
@@ -346,6 +367,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
         peak_scores = pd.read_table(f'{outdir}/{prefix}.cistopic.k_{k_optim}.topic_loadings.txt.gz', index_col = 0)
         with open(f'{outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', 'wb') as f:
             pickle.dump({topic: peaks.sort_values(ascending = False).head(top) for topic, peaks in peak_scores.items()}, f)
+    log.log(f'Binarised topics using top {top} peaks are saved to {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', calling_file = 'run_cistopic')
 
     # convert the binarized topics to a dict of pyRanges objects
     import pyranges as pr
