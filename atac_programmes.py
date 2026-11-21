@@ -512,8 +512,8 @@ def main(args):
 
 def add_cmd_args(parser):
     parser.add_argument('--cistopic', action = 'store_true', help = 'Run cistopic to identify gene programmes')
-    parser.add_argument('--cistopic_components', type = int, nargs = '+', default = [25, 500, 25],
-        help = 'Number of components to identify for cistopic (start, stop, step), default: 25 to 500 in steps of 25')
+    parser.add_argument('--cistopic_components', type = int, nargs = '+', default = [25, 125, 5],
+        help = 'Number of components to identify for cistopic (start, stop, step), default: 25 to 125 in steps of 5')
     parser.add_argument('--cistopic_alpha', type = float, default = 50, help = 'Alpha parameter for cistopic (default: 50)')
     parser.add_argument('--cistopic_eta', type = float, default = 0.1, help = 'Eta parameter for cistopic (default: 0.1)')
     parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet/bin/mallet',
@@ -522,8 +522,8 @@ def add_cmd_args(parser):
         default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases')
 
     parser.add_argument('--scopen', action = 'store_true', help = 'Run scOpen to identify gene programmes')
-    parser.add_argument('--scopen_components', type = int, nargs = '+', default = [25, 500, 25],
-        help = 'Number of components to identify for scOpen (start, stop, step), default: 25 to 500 in steps of 25')
+    parser.add_argument('--scopen_components', type = int, nargs = '+', default = [25, 125, 5],
+        help = 'Number of components to identify for scOpen (start, stop, step), default: 25 to 125 in steps of 5')
 
     parser.add_argument('--downsample', type = int, default = -1, 
         help = 'Downsample cells to this number for cistopic/scOpen (default: -1 = auto, specify 0 for no downsampling)')
