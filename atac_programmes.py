@@ -395,6 +395,16 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     #     ).assign(topic = topic) for topic, topic_dict in topics_pygreat.items()])
     # topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
 
+    # drop all topics / DARs with fewer than 1000 peaks, or pycisTarget may raise an error
+    for topic, peaks in binarised_topics_pr.items():
+        if len(peaks) < 1000:
+            log.warn(f'{topic} in {dataset}/{prefix} has only {len(peaks)} peaks after binarization, skipping pycisTarget analysis', calling_file = 'run_cistopic')
+            del binarised_topics_pr[topic]
+    for ct, peaks in dar_pr.items():
+        if len(peaks) < 1000:
+            log.warn(f'{ct} in {dataset}/{prefix} has only {len(peaks)} peaks after binarization, skipping pycisTarget analysis', calling_file = 'run_cistopic')
+            del dar_pr[ct]
+
     # pycisTarget pipeline
     topics_ctx, dar_ctx = _run_cistarget_ctx(dataset, prefix, outdir, cell_type[0], binarised_topics_pr, dar_pr,
         ctx_db_path = f'{scenic_db}/hg38_screen_v10_clust.regions_vs_motifs.rankings.feather',
