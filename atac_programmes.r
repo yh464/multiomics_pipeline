@@ -20,6 +20,13 @@ if (args$cicero & args$chromvar) {stop("Please choose either --cicero or --chrom
 print('Input arguments:')
 print(args)
 
+library(BiocParallel)
+# get n_cpu from system variable SLURM_CPUS_PER_TASK
+n_cpu = as.numeric(Sys.getenv("SLURM_CPUS_PER_TASK", unset = 1))
+# use detectCores as a fallback if SLURM_CPUS_PER_TASK is not set
+if (is.na(n_cpu) || n_cpu < 1) n_cpu = parallel::detectCores()
+register(MulticoreParam(n_cpu))
+
 #### Cicero main code ####
 run.cicero = function(args) { # run_cicero is a cicero package function so use dot
     library(anndataR)

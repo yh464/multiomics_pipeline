@@ -131,6 +131,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
                 metrics_list.append(model.metrics.assign(k = model.n_topic).set_index('k'))
 
         k_selection_metrics = pd.concat(metrics_list).sort_index().reset_index()
+        k_selection_metrics.columns = k_selection_metrics.columns.str.lower()
         k_optim = _cistopic_select_k(k_selection_metrics) # need to select k_optim within the range of input n_components
         log.log(f'Automatically selecting {k_optim} topics for {dataset}/{prefix} based on mimno and loglikelihood', calling_file = 'run_cistopic')
         log.warn(f'Please check {outdir}/{prefix}.cistopic.k_selection_metrics.pdf for details', calling_file = 'run_cistopic')
@@ -512,8 +513,8 @@ def main(args):
 
 def add_cmd_args(parser):
     parser.add_argument('--cistopic', action = 'store_true', help = 'Run cistopic to identify gene programmes')
-    parser.add_argument('--cistopic_components', type = int, nargs = '+', default = [25, 125, 5],
-        help = 'Number of components to identify for cistopic (start, stop, step), default: 25 to 125 in steps of 5')
+    parser.add_argument('--cistopic_components', type = int, nargs = '+', default = [5, 125, 5],
+        help = 'Number of components to identify for cistopic (start, stop, step), default: 5 to 125 in steps of 5')
     parser.add_argument('--cistopic_alpha', type = float, default = 50, help = 'Alpha parameter for cistopic (default: 50)')
     parser.add_argument('--cistopic_eta', type = float, default = 0.1, help = 'Eta parameter for cistopic (default: 0.1)')
     parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet/bin/mallet',
@@ -522,8 +523,8 @@ def add_cmd_args(parser):
         default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases')
 
     parser.add_argument('--scopen', action = 'store_true', help = 'Run scOpen to identify gene programmes')
-    parser.add_argument('--scopen_components', type = int, nargs = '+', default = [25, 125, 5],
-        help = 'Number of components to identify for scOpen (start, stop, step), default: 25 to 125 in steps of 5')
+    parser.add_argument('--scopen_components', type = int, nargs = '+', default = [5, 125, 5],
+        help = 'Number of components to identify for scOpen (start, stop, step), default: 5 to 125 in steps of 5')
 
     parser.add_argument('--cicero', action = 'store_true', help = 'Run Cicero to identify co-accessible peaks')
 
