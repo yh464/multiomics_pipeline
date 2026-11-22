@@ -30,7 +30,7 @@ run.cicero = function(args) { # run_cicero is a cicero package function so use d
 
     adata = read_h5ad(args$input)
     X = adata$X
-    counts = Matrix::t(X, sparse = TRUE)
+    counts = Matrix::t(X)
 
     # Build Monocle3 CDS
     peak_metadata = adata$var %>% rownames_to_column("peak") %>% mutate(peak = gsub(":|-", "_", peak)) %>% as_tibble()
