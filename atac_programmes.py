@@ -4,7 +4,7 @@ Author: Yuankai He
 Correspondence: yh464@cam.ac.uk
 Version 1: 2026-11-04
 
-Pipelines to identify gene programmes from scATAC-seq data
+Python pipelines to identify gene programmes from scATAC-seq data
 '''
 
 # scanpy takes long to import so needs to be imported in each sub-function
