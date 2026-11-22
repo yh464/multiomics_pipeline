@@ -525,6 +525,8 @@ def add_cmd_args(parser):
     parser.add_argument('--scopen_components', type = int, nargs = '+', default = [25, 125, 5],
         help = 'Number of components to identify for scOpen (start, stop, step), default: 25 to 125 in steps of 5')
 
+    parser.add_argument('--cicero', action = 'store_true', help = 'Run Cicero to identify co-accessible peaks')
+
     parser.add_argument('--downsample', type = int, default = -1, 
         help = 'Downsample cells to this number for cistopic/scOpen (default: -1 = auto, specify 0 for no downsampling)')
     parser.add_argument('--niter', type = int, default = 100, help = 'Number of iterations for cistopic/scOpen (default: 100)')

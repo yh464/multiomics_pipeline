@@ -22,17 +22,23 @@ def main(args):
     cistopic_prep_submitter = array_submitter(name = 'cistopic_prep_batch_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus')
     cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
-        partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus', dependency = cistopic_prep_submitter)
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus', dependency = cistopic_prep_submitter)
     scopen_prep_submitter = array_submitter(name = 'scopen_prep_batch_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen')
     scopen_submitter = array_submitter(name = 'scopen_batch_' + '_'.join(args.datasets)+'_'+str(max(args.scopen_components)),
-        partition = 'icelake-himem', n_cpu = 16, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen', dependency = scopen_prep_submitter)
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen', dependency = scopen_prep_submitter)
+    cicero_submitter = array_submitter(name = 'cicero_batch_' + '_'.join(args.datasets),
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = 'sctoolsr')
     
     h5ad = proj.find_h5ad(args.datasets, normalised = False)
     cistopic_outdir = 'programmes/cistopic/$dataset/$prefix'
     proj.register('atac_programmes_cistopic',f'{cistopic_outdir}/$prefix.cistopic.k_$k.topic_loadings.txt.gz')
     scopen_outdir = 'programmes/scopen/$dataset/$prefix'
     proj.register('atac_programmes_scopen',f'{scopen_outdir}/$prefix.scopen.k_$k.weights.txt')
+    cicero_outdir = 'programmes/cicero/$dataset/$prefix'
+    proj.register('atac_programmes_cicero',f'{cicero_outdir}/$prefix.cicero.ccans.txt')
+    chromvar_outdir = 'programmes/chromvar/$dataset/$prefix'
+    # TODO
 
     for dataset, prefix in h5ad:
         if not check_atac(dataset, prefix): continue
@@ -90,8 +96,15 @@ def main(args):
             else:
                 for c in cmds: scopen_submitter.add(c)
 
+        if args.cicero:
+            cmd = ['Rscript', 'atac_programmes.r', '--in', proj.to_pathname('raw', dataset = dataset, prefix = prefix), 
+                '--out', os.path.dirname(proj.to_pathname('atac_programmes_cicero', dataset = dataset, prefix = prefix)) + f'/{prefix}', '--cicero']
+            if getattr(args, 'force'): cmd.append('--force')
+            cicero_submitter.add(' '.join(cmd))
+
     cistopic_submitter.submit()
     scopen_submitter.submit()
+    cicero_submitter.submit()
 
 if __name__ == '__main__':
     import argparse
@@ -99,7 +112,7 @@ if __name__ == '__main__':
     parser.add_argument('datasets', nargs = '+', help = 'List of dataset names / prefixes to process')
     parser = add_cmd_args(parser)
     args = parser.parse_args()
-    if not args.cistopic and not args.scopen:
+    if not args.cistopic and not args.scopen and not args.cicero:
         log.warn('No method selected, defaults to cistopic')
         args.cistopic = True
 
