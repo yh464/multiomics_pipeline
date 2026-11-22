@@ -62,6 +62,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
     if len(n_components) == 1: k_optim = n_components[0]
     elif os.path.isfile(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt'):
         k_selection_metrics = pd.read_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', sep = '\t')
+        k_selection_metrics = k_selection_metrics.loc[k_selection_metrics.k.isin(n_components)].copy() # only consider the requested n_components
         k_optim = _cistopic_select_k(k_selection_metrics)
         # new n_components may not overlap with previous runs, need to check all runs are complete
         if len(check_cistopic_complete(dataset, prefix, n_components = n_components)) > 0: k_optim = None
