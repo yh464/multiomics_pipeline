@@ -128,7 +128,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         for n_topics in n_components:
             with open(f'{outdir}/temp/{prefix}.cistopic.k_{n_topics}.{niter}iter.model.pkl', 'rb') as f: 
                 model = pickle.load(f)
-                metrics_list.append([model.metrics.assign(k = model.n_topic).set_index('k')])
+                metrics_list.append(model.metrics.assign(k = model.n_topic).set_index('k'))
 
         k_selection_metrics = pd.concat(metrics_list).sort_index().reset_index()
         k_optim = _cistopic_select_k(k_selection_metrics) # need to select k_optim within the range of input n_components
