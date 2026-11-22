@@ -373,12 +373,12 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
 
     # convert the binarized topics to a dict of pyRanges objects
     import pyranges as pr
-    binarised_topics_pr = {topic: pr.PyRanges(
+    binarised_topics_pr_unfiltered = {topic: pr.PyRanges(
         chromosomes = peaks.index.str.split(':|-').str[0],
         starts = peaks.index.str.split(':|-').str[1].astype(int),
         ends = peaks.index.str.split(':|-').str[2].astype(int))
         for topic, peaks in binarised_topics.items()}
-    dar_pr = {re.sub('[^A-Za-z0-9]+', '_', ct): pr.PyRanges(
+    dar_pr_unfiltered = {re.sub('[^A-Za-z0-9]+', '_', ct): pr.PyRanges(
         chromosomes = peaks.index.str.split(':|-').str[0],
         starts = peaks.index.str.split(':|-').str[1].astype(int),
         ends = peaks.index.str.split(':|-').str[2].astype(int)
@@ -396,14 +396,15 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     # topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
 
     # drop all topics / DARs with fewer than 1000 peaks, or pycisTarget may raise an error
-    for topic, peaks in binarised_topics_pr.items():
+    binarised_topics_pr = {}; dar_pr = {}
+    for topic, peaks in binarised_topics_pr_unfiltered.items():
         if len(peaks) < 1000:
             log.warn(f'{topic} in {dataset}/{prefix} has only {len(peaks)} peaks after binarization, skipping pycisTarget analysis', calling_file = 'run_cistopic')
-            del binarised_topics_pr[topic]
-    for ct, peaks in dar_pr.items():
+        else: binarised_topics_pr[topic] = peaks
+    for ct, peaks in dar_pr_unfiltered.items():
         if len(peaks) < 1000:
-            log.warn(f'{ct} in {dataset}/{prefix} has only {len(peaks)} peaks after binarization, skipping pycisTarget analysis', calling_file = 'run_cistopic')
-            del dar_pr[ct]
+            log.warn(f'DARs for {ct} in {dataset}/{prefix} has only {len(peaks)} peaks after binarization, skipping pycisTarget analysis', calling_file = 'run_cistopic')
+        else: dar_pr[ct] = peaks
 
     # pycisTarget pipeline
     topics_ctx, dar_ctx = _run_cistarget_ctx(dataset, prefix, outdir, cell_type[0], binarised_topics_pr, dar_pr,
