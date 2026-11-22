@@ -43,15 +43,51 @@ def check_cistopic_complete(dataset, prefix, n_components = range(25, 501, 25), 
     return incomplete_idx
 
 def _cistopic_select_k(k_selection_metrics):
-        k_selection_metrics = k_selection_metrics.copy()
-        k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1
-        k_selection_metrics_scaled = k_selection_metrics.copy()
-        for col in ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
-            k_selection_metrics_scaled[col] = (k_selection_metrics[col] - k_selection_metrics[col].min()) / (k_selection_metrics[col].max() - k_selection_metrics[col].min())
-        # compare using just mimno and loglikelihood
-        k_selection_metrics_scaled['score'] = k_selection_metrics_scaled[['mimno_2011', 'loglikelihood']].mean(axis = 1)
-        k_optim = k_selection_metrics_scaled.loc[k_selection_metrics_scaled['score'].idxmax(), 'k']
-        return k_optim
+    k_selection_metrics = k_selection_metrics.copy()
+    k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1
+    k_selection_metrics_scaled = k_selection_metrics.copy()
+    for col in ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']:
+        k_selection_metrics_scaled[col] = (k_selection_metrics[col] - k_selection_metrics[col].min()) / (k_selection_metrics[col].max() - k_selection_metrics[col].min())
+    # compare using just mimno and loglikelihood
+    k_selection_metrics_scaled['score'] = k_selection_metrics_scaled[['mimno_2011', 'loglikelihood']].mean(axis = 1)
+    k_optim = k_selection_metrics_scaled.loc[k_selection_metrics_scaled['score'].idxmax(), 'k']
+    return k_optim
+
+def _plot_cistopic_k_selection_metrics(prefix, outdir, k_selection_metrics, n_components = None):
+    # region: plot scaled metrics, similar to gene_programmes.py lines 423-447
+    k_selection_metrics = k_selection_metrics.copy()
+    k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1 # needed for plotting as these metrics are inverted
+    if n_components is not None:
+        k_selection_metrics = k_selection_metrics.loc[k_selection_metrics.k.isin(n_components)] # only plot the requested n_components
+    fig, ax0 = plt.subplots(figsize = (5,2))
+    ax1 = ax0.twinx(); ax2 = ax0.twinx(); ax3 = ax0.twinx()
+    for plot_ax, stat, label, colour, style in zip(
+        [ax0, ax1, ax2, ax3],
+        ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood'],
+        ['Arun (2010)', 'Cao (2009)', 'Mimno (2011)', 'Log-likelihood'],
+        ['#1f78b4','#33a02c', '#6a3d9a','#000000'],
+        ['--', '-', '-.', ':']
+    ):
+        plot_ax.plot(k_selection_metrics.k, k_selection_metrics[stat], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
+        plot_ax.spines[['top', 'right', 'bottom']].set_visible(False)
+        plot_ax.set_xticks(np.arange(k_selection_metrics.k.min(), k_selection_metrics.k.max() + 1, 
+            max(int((k_selection_metrics.k.max() - k_selection_metrics.k.min()) / 8), 5))) # max 9 ticks, min gap between ticks = 5
+        plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
+        plot_ax.yaxis.set_label_position('left')
+        plot_ax.yaxis.tick_left()
+        plot_ax.spines['left'].set_color(colour)
+        plot_ax.tick_params(axis = 'y', colors = colour)
+        plot_ax.set_ylabel('')
+    ax0.grid(True, 'both','x')
+    ax1.spines['left'].set_position(('outward', 40))
+    ax2.spines['left'].set_position(('outward', 80))
+    ax3.spines['left'].set_position(('outward', 120))
+    ax0.set_xlabel('Number of components (k)', fontsize = 14)
+    lines = ax0.get_lines() + ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
+    ax1.legend(lines[:4], ['Arun (2010) inverted', 'Cao (2009) inverted', 'Mimno (2011)', 'Log-likelihood'], loc = 'upper center', frameon = False,
+        bbox_to_anchor = (0.3, -0.3), ncol = 2, columnspacing = 0.5, fontsize = 12)
+    fig.savefig(f'{outdir}/{prefix}.cistopic.k_selection_metrics.pdf', bbox_inches = 'tight')
+    # endregion
 
 def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(25, 501, 25), worker = 0, niter = 100, 
     alpha = 50, eta = 0.1, mallet = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet', downsample = -1,
@@ -64,6 +100,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         k_selection_metrics = pd.read_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', sep = '\t')
         k_selection_metrics = k_selection_metrics.loc[k_selection_metrics.k.isin(n_components)].copy() # only consider the requested n_components
         k_optim = _cistopic_select_k(k_selection_metrics)
+        _plot_cistopic_k_selection_metrics(prefix, outdir, k_selection_metrics, n_components = n_components)
         # new n_components may not overlap with previous runs, need to check all runs are complete
         if len(check_cistopic_complete(dataset, prefix, n_components = n_components)) > 0: k_optim = None
     else: k_optim = None
@@ -117,11 +154,6 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         log.log('Waiting for other workers to finish cistopic model fitting', calling_file = 'run_cistopic')
         return None, None, None
 
-    # if all workers have finished, clean cache files that cannot be reused
-    for x in glob.glob(f'{outdir}/temp/*state.mallet.gz') + glob.glob(f'{outdir}/temp/*inferencer.mallet') + \
-        glob.glob(f'{outdir}/temp/*doctopics.txt') + glob.glob(f'{outdir}/temp/*topickeys.txt') + glob.glob(f'{outdir}/temp/Topic*.pkl'):
-        if os.path.isfile(x): os.remove(x)
-
     # compare models
     if len(n_components) > 1:
         log.log(f'Comparing cistopic models for {dataset}/{prefix}', calling_file = 'run_cistopic')
@@ -142,39 +174,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
                 ).drop_duplicates(subset = 'k').sort_values('k').reset_index(drop = True)
         k_selection_metrics.columns = ['k','arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood']
         k_selection_metrics.to_csv(f'{outdir}/{prefix}.cistopic.k_selection_metrics.txt', index = False, sep = '\t')
-        
-        # region: plot scaled metrics, similar to gene_programmes.py lines 423-447
-        k_selection_metrics[['arun_2010', 'cao_juan_2009']] *= -1 # needed for plotting as these metrics are inverted
-        k_selection_metrics = k_selection_metrics.loc[k_selection_metrics.k.isin(n_components)].copy() # only plot the requested n_components
-        fig, ax0 = plt.subplots(figsize = (5,2))
-        ax1 = ax0.twinx(); ax2 = ax0.twinx(); ax3 = ax0.twinx()
-        for plot_ax, stat, label, colour, style in zip(
-            [ax0, ax1, ax2, ax3],
-            ['arun_2010', 'cao_juan_2009', 'mimno_2011', 'loglikelihood'],
-            ['Arun (2010)', 'Cao (2009)', 'Mimno (2011)', 'Log-likelihood'],
-            ['#1f78b4','#33a02c', '#6a3d9a','#000000'],
-            ['--', '-', '-.', ':']
-        ):
-            plot_ax.plot(k_selection_metrics.k, k_selection_metrics[stat], label = label, c = colour, linestyle = style, marker = 'none', linewidth = 2)
-            plot_ax.spines[['top', 'right', 'bottom']].set_visible(False)
-            plot_ax.set_xticks(np.arange(k_selection_metrics.k.min(), k_selection_metrics.k.max() + 1, 
-                max(int((k_selection_metrics.k.max() - k_selection_metrics.k.min()) / 8), 5))) # max 9 ticks, min gap between ticks = 5
-            plot_ax.tick_params(axis = 'x', bottom = True, labelbottom = True)
-            plot_ax.yaxis.set_label_position('left')
-            plot_ax.yaxis.tick_left()
-            plot_ax.spines['left'].set_color(colour)
-            plot_ax.tick_params(axis = 'y', colors = colour)
-            plot_ax.set_ylabel('')
-        ax0.grid(True, 'both','x')
-        ax1.spines['left'].set_position(('outward', 40))
-        ax2.spines['left'].set_position(('outward', 80))
-        ax3.spines['left'].set_position(('outward', 120))
-        ax0.set_xlabel('Number of components (k)', fontsize = 14)
-        lines = ax0.get_lines() + ax1.get_lines() + ax2.get_lines() + ax3.get_lines()
-        ax1.legend(lines[:4], ['Arun (2010) inverted', 'Cao (2009) inverted', 'Mimno (2011)', 'Log-likelihood'], loc = 'upper center', frameon = False,
-            bbox_to_anchor = (0.3, -0.3), ncol = 2, columnspacing = 0.5, fontsize = 12)
-        fig.savefig(f'{outdir}/{prefix}.cistopic.k_selection_metrics.pdf', bbox_inches = 'tight')
-        # endregion
+        _plot_cistopic_k_selection_metrics(prefix, outdir, k_selection_metrics, n_components = n_components)
     else: 
         k_optim = n_components[0]
 
@@ -415,6 +415,10 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
         motif_annot_path = f'{scenic_db}/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl',
         force = force) # use default arguments for pycisTarget, which are copied from pycistarget package default
 
+    # if all workers have finished, clean cache files that cannot be reused
+    for x in glob.glob(f'{outdir}/temp/*state.mallet.gz') + glob.glob(f'{outdir}/temp/*inferencer.mallet') + \
+        glob.glob(f'{outdir}/temp/*doctopics.txt') + glob.glob(f'{outdir}/temp/*topickeys.txt') + glob.glob(f'{outdir}/temp/Topic*.pkl'):
+        if os.path.isfile(x): os.remove(x)
 # endregion
 
 # region: scOpen pipeline
