@@ -34,7 +34,7 @@ def get_genes_list(df, gene_col = None, top = -1, by = None, cutoff = None, top_
     if cutoff != None and cutoff < 0: cutoff = -cutoff
     if (top == -1 and (cutoff == None or by == None)) or df.shape[0] <= top: 
         top = df.shape[0]; top_negative = False
-    ref = pd.read_table(ref, index_col = 0)
+    if isinstance(ref, str): ref = pd.read_table(ref, index_col = 0)
 
     # find column corresponding to gene names
     genes = None
@@ -88,9 +88,11 @@ def get_genes_list(df, gene_col = None, top = -1, by = None, cutoff = None, top_
     if len(genes_p) > 0 and any(isinstance(g, str) and g.startswith('ENSG') for g in genes_p):
         genes_p_ensg = [x for x in genes_p if x in ref.index]
         genes_p = ref.loc[genes_p_ensg, 'LABEL'].dropna().unique().tolist() + [x for x in genes_p if not x in ref.index]
+        if top > -1: assert len(genes_p) == min(top, len(df)), f'Number of genes after mapping to labels is {len(genes_p)}, which is not equal to the specified top {top}'
     if len(genes_n) > 0 and any(isinstance(g, str) and g.startswith('ENSG') for g in genes_n):
         genes_n_ensg = [x for x in genes_n if x in ref.index]
         genes_n = ref.loc[genes_n_ensg, 'LABEL'].dropna().unique().tolist() + [x for x in genes_n if not x in ref.index]
+        if top > -1: assert len(genes_n) == min(top, len(df)), f'Number of genes after mapping to labels is {len(genes_n)}, which is not equal to the specified top {top}'
     if len(genes) > 0 and any(isinstance(g, str) and g.startswith('ENSG') for g in genes):
         genes_ensg = [x for x in genes if x in ref.index]
         genes = ref.loc[genes_ensg, 'LABEL'].dropna().unique().tolist() + [x for x in genes if not x in ref.index]
@@ -116,11 +118,12 @@ def enrichr_list(genes, background = None, databases =
     return out
 
 def enrichr_continuous(df, gene_col = None, top = -1, by = None, cutoff = None, top_negative = True, use_background = True, silent = False, 
+    ref = '/home/yh464/rds/rds-rb643-ukbiobank2/Data_Users/yh464/params/genes_ref.txt',
     databases = ['GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 'SynGO_2024']):
     if isinstance(df, pd.Series): df = df.to_frame()
     if df.shape[1] == 1: by = df.columns[0]
     cutoff = abs(cutoff) if cutoff != None else None
-    genes_lists, background = get_genes_list(df, gene_col = gene_col, top = top, by = by, cutoff = cutoff, top_negative = top_negative)
+    genes_lists, background = get_genes_list(df, gene_col = gene_col, top = top, by = by, cutoff = cutoff, top_negative = top_negative, ref = ref)
     if not use_background: background = None
     out = []
     out.append(enrichr_list(genes_lists[0], background = background, databases = databases).assign(
