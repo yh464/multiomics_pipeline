@@ -42,7 +42,7 @@ def _load_go_df():
     out_df = []
     for file in go_files:
         dataset = file.split('.')[0]
-        f = open(file).read().splitlines()
+        f = open(os.path.join(tool['go'], file)).read().splitlines()
         for line in f:
             line = line.split('\t')
             name = line[0]
