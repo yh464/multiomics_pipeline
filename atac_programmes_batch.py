@@ -66,7 +66,7 @@ def main(args):
             cmds = []
             for i in (incomplete := check_cistopic_complete(dataset, prefix, niter = args.niter,
                 n_components = range(args.cistopic_components[0], args.cistopic_components[1]+1, args.cistopic_components[2])
-                ) if len(args.cistopic_components) == 3 else [args.cistopic_components[0]]):
+                ) if len(args.cistopic_components) == 3 else [0]):
                 cmds.append(cmd + f' --cistopic --worker {i}')
             if len(incomplete) == 0:
                 cmds.append(cmd + f' --cistopic --worker 0')
@@ -84,7 +84,7 @@ def main(args):
             cmds = []
             for i in (incomplete := check_scopen_complete(dataset, prefix, 
                 n_components = range(args.scopen_components[0], args.scopen_components[1]+1, args.scopen_components[2])
-                ) if len(args.scopen_components) == 3 else [args.scopen_components]):
+                ) if len(args.scopen_components) == 3 else [0]):
                 cmds.append(cmd + f' --scopen --worker {i}')
             if len(incomplete) == 0:
                 cmds.append(cmd + f' --scopen --worker 0')
