@@ -123,6 +123,7 @@ def enrichr_continuous(df, gene_col = None, top = -1, by = None, cutoff = None, 
     if isinstance(df, pd.Series): df = df.to_frame()
     if df.shape[1] == 1: by = df.columns[0]
     cutoff = abs(cutoff) if cutoff != None else None
+    top = min(top, df.shape[0]) if top > 0 else -1
     genes_lists, background = get_genes_list(df, gene_col = gene_col, top = top, by = by, cutoff = cutoff, top_negative = top_negative, ref = ref)
     if not use_background: background = None
     out = []
