@@ -85,15 +85,15 @@ def get_genes_list(df, gene_col = None, top = -1, by = None, cutoff = None, top_
     if len(genes) > 0 and isinstance(genes[0],list): genes = [g for l in genes for g in l]
     
     # map genes to labels
-    if len(genes_p) > 0 and any(isinstance(g, str) and g.startswith('ENSG') for g in genes_p):
+    if len(genes_p) > 0:
         genes_p_ensg = [x for x in genes_p if x in ref.index]
         genes_p = ref.loc[genes_p_ensg, 'LABEL'].dropna().unique().tolist() + [x for x in genes_p if not x in ref.index]
         if top > -1: assert len(genes_p) == min(top, len(df)), f'Number of genes after mapping to labels is {len(genes_p)}, which is not equal to the specified top {top}'
-    if len(genes_n) > 0 and any(isinstance(g, str) and g.startswith('ENSG') for g in genes_n):
+    if len(genes_n) > 0:
         genes_n_ensg = [x for x in genes_n if x in ref.index]
         genes_n = ref.loc[genes_n_ensg, 'LABEL'].dropna().unique().tolist() + [x for x in genes_n if not x in ref.index]
         if top > -1: assert len(genes_n) == min(top, len(df)), f'Number of genes after mapping to labels is {len(genes_n)}, which is not equal to the specified top {top}'
-    if len(genes) > 0 and any(isinstance(g, str) and g.startswith('ENSG') for g in genes):
+    if len(genes) > 0:
         genes_ensg = [x for x in genes if x in ref.index]
         genes = ref.loc[genes_ensg, 'LABEL'].dropna().unique().tolist() + [x for x in genes if not x in ref.index]
 
