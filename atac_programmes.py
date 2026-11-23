@@ -248,7 +248,9 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
         log.log(f'Identifying differentially accessible regions for {dataset}/{prefix}', calling_file = 'run_cistopic')
         imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
+        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx) # convert to sparse matrix to save memory
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
+        norm_imputed_obj.mtx = sparse.csr_matrix(norm_imputed_obj.mtx) # convert to sparse matrix to save memory
         hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
             n_bins = 20, n_top_features = None, plot = False)
         log.log(f'Found {len(hvp)} highly variable peaks for {dataset}/{prefix}', calling_file = 'run_cistopic')
