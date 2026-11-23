@@ -43,7 +43,7 @@ def factor_enrichr(scores, top_negative = True, top = [100, 200, 500, 1000, 2000
 
     # convert above to a parallelised version
     tasks = [(scores, 'index', t, col, None, top_negative, False, True) for col in scores.columns for t in top]
-    with Pool(8) as pool:
+    with Pool(8) as pool: # the rate limiting factor is HTTPS request so no more than 8 processes
         out = list(tqdm(pool.starmap(enrichr_continuous, tasks), total = len(tasks), desc = 'Enrichr analysis for all factors'))
     for i, (col, t) in enumerate([(col, t) for col in scores.columns for t in top]):
         enrichr_res = out[i]

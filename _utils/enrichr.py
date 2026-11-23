@@ -40,16 +40,16 @@ def get_genes_list(df, gene_col = None, top = -1, by = None, cutoff = None, top_
     genes = None
     if gene_col == 'index': genes = df.index.tolist()
     elif gene_col != None and gene_col in df.columns: genes = df[gene_col].tolist()
-    elif isinstance(df.index[0], str) and df.index[0].startswith('ENSG'):
+    elif isinstance(df.index[0], str) and df.index.str.startswith('ENSG').any():
         genes = df.index.tolist()
-    elif isinstance(df.columns[0], str) and df.columns[0].startswith('ENSG'):
+    elif isinstance(df.columns[0], str) and df.columns.str.startswith('ENSG').any():
         genes = df.columns.tolist()
     else:
         for col in df.columns:
             if col.lower() in ['gene','genes','gene_name','feature_name','geneid']:
                 genes = df[col].tolist()
                 break
-            if df[col].dtype == str and df[col].iloc[0].startswith('ENSG'):
+            if df[col].dtype == str and df[col].str.startswith('ENSG').any():
                 genes = df[col].tolist()
                 break
     # find genes by genomic position
