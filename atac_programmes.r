@@ -36,22 +36,9 @@ run.cicero = function(args) { # run_cicero is a cicero package function so use d
     library(tidyverse)
 
     adata = read_h5ad(args$input)
-    X = adata$X
-    counts = X %>% t() %>% as('CsparseMatrix') # transpose to have peaks as rows and cells as columns
-
-    # Build Monocle3 CDS
-    peak_metadata = adata$var %>% rownames_to_column('peak') %>% mutate(peak = gsub(':|-', '_', peak)) %>% 
-        column_to_rownames('peak') %>% as.data.frame()
-    rownames(counts) = rownames(peak_metadata)
-    cell_metadata = adata$obs %>% as.data.frame()
-    cds = new_cell_data_set(
-        expression_data = counts,
-        cell_metadata = cell_metadata,
-        gene_metadata = peak_metadata
-    )
     
     # extract all chromosomes contained in the dataset (may contain insertions like GL000220.1)
-    chromosomes = peak_metadata %>% rownames %>% str_split_fixed('_', 3) %>% as_tibble() %>% select(V1) %>% distinct() %>% pull()
+    chromosomes = adata$var_names %>% str_split_fixed(':', 2) %>% as_tibble() %>% select(V1) %>% distinct() %>% pull()
     genome.df = data.frame(chromosome = chromosomes, stringsAsFactors = FALSE)
     # fetch chromosome lengths for hg38
     genome_info = GenomeInfoDb::Seqinfo(genome = 'hg38')
@@ -69,7 +56,23 @@ run.cicero = function(args) { # run_cicero is a cicero package function so use d
                 return(NA)
             }
         }
-    })
+    }) %>% drop_na()
+
+    # subset to only include peaks where a chromosome length is available
+    adata = adata[, adata$var_names %>% str_split_fixed(':', 2) %>% as_tibble() %>% select(V1) %>% pull() %in% genome.df$chromosome]
+    X = adata$X
+    counts = X %>% t() %>% as('CsparseMatrix') # transpose to have peaks as rows and cells as columns
+
+    # Build Monocle3 CDS
+    peak_metadata = adata$var %>% rownames_to_column('peak') %>% mutate(peak = gsub(':|-', '_', peak)) %>% 
+        column_to_rownames('peak') %>% as.data.frame()
+    rownames(counts) = rownames(peak_metadata)
+    cell_metadata = adata$obs %>% as.data.frame()
+    cds = new_cell_data_set(
+        expression_data = counts,
+        cell_metadata = cell_metadata,
+        gene_metadata = peak_metadata
+    )
 
     # Search for dimensionality reduction results in the following order: UMAP, tSNE, LSI
     if ('X_umap' %in% names(adata$obsm)) {

@@ -29,8 +29,9 @@ mpl.rcParams['font.family'] = 'Arial'
 
 from _utils.logger import logger
 log = logger()
-from _utils.path import project
+from _utils.path import project, toolbox
 proj = project()
+tool = toolbox()
 
 # region: cisTopic pipeline
 def check_cistopic_complete(dataset, prefix, n_components = range(25, 501, 25), niter = 100):
@@ -519,7 +520,7 @@ def main(args):
     scopen_outdir = os.path.dirname(proj.to_pathname('atac_programmes_scopen', args.dataset, args.prefix))
     if args.cistopic:
         run_cistopic(args.dataset, args.prefix, cistopic_outdir, n_components = args.cistopic_components, worker = args.worker, niter = args.niter,
-            alpha = args.cistopic_alpha, eta = args.cistopic_eta, mallet = args.mallet, scenic_db = args.scenic_db,
+            alpha = args.cistopic_alpha, eta = args.cistopic_eta, mallet = tool['mallet'], scenic_db = tool['scenic_db'],
             cell_type = args.cell_type, embedding = args.embedding, time_key = args.time_key, seed = 19260817, downsample = args.downsample,
             force = args.force, savedir = args.magma_out if args.magma else None, top = args.top)
     if args.scopen:
@@ -533,10 +534,10 @@ def add_cmd_args(parser):
         help = 'Number of components to identify for cistopic (start, stop, step), default: 5 to 125 in steps of 5')
     parser.add_argument('--cistopic_alpha', type = float, default = 50, help = 'Alpha parameter for cistopic (default: 50)')
     parser.add_argument('--cistopic_eta', type = float, default = 0.1, help = 'Eta parameter for cistopic (default: 0.1)')
-    parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/mallet/bin/mallet',
-        help = 'Path to mallet binary for cistopic. (default: /rds/project/rds-Nl99R8pHODQ/toolbox/mallet)')
-    parser.add_argument('--scenic_db', help = 'SCENIC+ database directory for pycisTarget; KEEP DEFAULT FILE NAMES',
-        default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases')
+    # parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/mallet/bin/mallet',
+    #     help = 'Path to mallet binary for cistopic. (default: /rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/mallet/bin/mallet)')
+    # parser.add_argument('--scenic_db', help = 'SCENIC+ database directory for pycisTarget; KEEP DEFAULT FILE NAMES',
+    #     default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases')
 
     parser.add_argument('--scopen', action = 'store_true', help = 'Run scOpen to identify gene programmes')
     parser.add_argument('--scopen_components', type = int, nargs = '+', default = [5, 125, 5],

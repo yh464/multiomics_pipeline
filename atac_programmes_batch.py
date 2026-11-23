@@ -10,8 +10,9 @@ Pipelines to identify gene programmes from scATAC-seq data
 import os
 from _utils.logger import logger
 log = logger()
-from _utils.path import project
+from _utils.path import project, toolbox
 proj = project()
+tool = toolbox()
 
 from _utils.slurm import array_submitter, add_slurm_args_dec
 from atac_programmes import add_cmd_args, check_cistopic_complete, check_scopen_complete
@@ -20,13 +21,13 @@ from _utils.adatatools import select_metadata_cols, check_atac
 
 def main(args):
     cistopic_prep_submitter = array_submitter(name = 'cistopic_prep_batch_' + '_'.join(args.datasets),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus')
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = tool['scenicplus'])
     cistopic_submitter = array_submitter(name = 'cistopic_batch_' + '_'.join(args.datasets)+'_'+str(max(args.cistopic_components)),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus', dependency = cistopic_prep_submitter)
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = tool['scenicplus'], dependency = cistopic_prep_submitter)
     scopen_prep_submitter = array_submitter(name = 'scopen_prep_batch_' + '_'.join(args.datasets),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen')
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = tool['scopen'])
     scopen_submitter = array_submitter(name = 'scopen_batch_' + '_'.join(args.datasets)+'_'+str(max(args.scopen_components)),
-        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = '/rds/project/rds-Nl99R8pHODQ/toolbox/scopen', dependency = scopen_prep_submitter)
+        partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = tool['scopen'], dependency = scopen_prep_submitter)
     cicero_submitter = array_submitter(name = 'cicero_batch_' + '_'.join(args.datasets),
         partition = 'icelake-himem', n_cpu = 32, timeout = 720, env = 'sctoolsr')
     
@@ -50,7 +51,8 @@ def main(args):
         else: selected_time_keys = args.time_key
 
         flags = []
-        for key in ['cistopic_components', 'cistopic_alpha', 'cistopic_eta', 'mallet', 'scenic_db','scopen_components', 'downsample', 'niter', 'top']:
+        for key in ['cistopic_components', 'cistopic_alpha', 'cistopic_eta', # 'mallet', 'scenic_db',
+                    'scopen_components', 'downsample', 'niter', 'top']:
             flags.append(f'--{key}')
             if type(getattr(args, key)) in [list, range, tuple]: flags.extend([str(x) for x in getattr(args, key)])
             else: flags.append(str(getattr(args, key)))
