@@ -65,7 +65,6 @@ def _greatpy_enrichment_single_set(args):
 
 def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
     import greatpy as great
-    import pyranges as pr
 
     if species in ['hg19', 'hg38']: species = 'human/' + species
     regdom_file = os.path.join(tool['greatpy'], 'data', species, 'regulatory_domain.bed')
@@ -74,7 +73,7 @@ def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
 
     if go_df is None: go_df = _load_go_df()
 
-    args_list = [(name, peak_set.as_df() if isinstance(peak_set, pr.PyRanges) else peak_set, 
+    args_list = [(name, peak_set.as_df() if not isinstance(peak_set, pd.DataFrame) else peak_set, # no dependency on pyranges if peak_set is DataFrame
         regdom_df, size_df, go_df) for name, peak_set in peak_dict.items()]
 
     with Pool(processes = min(len(peak_dict), n_cpu)) as pool:
@@ -571,16 +570,15 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     log.log(f'Automatically selecting {kl.knee} components for {dataset}/{prefix} based on knee point of reconstruction error', calling_file = 'run_scopen')
 
     # extract top 3000 peaks per factor and run greatpy
-    import pyranges as pr
     if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt') or force):
         W = pd.read_table(f'{outdir}/{prefix}.scopen.k_{kl.knee}.weights.txt', index_col = 0)
         top_peaks = {f'F{i}': W[f'F{i}'].sort_values(ascending = False).head(top) for i in range(1, kl.knee + 1)}
-        top_peaks_pr = {topic: pr.PyRanges(
+        top_peaks_df = {topic: pd.DataFrame(dict(
             chromosomes = peaks.index.str.split(':|-').str[0],
             starts = peaks.index.str.split(':|-').str[1].astype(int),
-            ends = peaks.index.str.split(':|-').str[2].astype(int))
+            ends = peaks.index.str.split(':|-').str[2].astype(int)))
             for topic, peaks in top_peaks.items()}
-        greatpy_results = greatpy_enrichment_batch(top_peaks_pr, species = 'hg38')
+        greatpy_results = greatpy_enrichment_batch(top_peaks_df, species = 'hg38')
         greatpy_results.to_csv(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt', sep = '\t', index = False)
 # endregion
 
