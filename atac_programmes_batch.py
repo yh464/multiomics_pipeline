@@ -100,7 +100,8 @@ def main(args):
 
         if args.cicero:
             cmd = ['Rscript', 'atac_programmes.r', '--in', proj.to_pathname('raw', dataset = dataset, prefix = prefix), 
-                '--out', os.path.dirname(proj.to_pathname('atac_programmes_cicero', dataset = dataset, prefix = prefix)) + f'/{prefix}', '--cicero']
+                '--out', os.path.dirname(proj.to_pathname('atac_programmes_cicero', dataset = dataset, prefix = prefix)) + f'/{prefix}', '--cicero',
+                '--downsample', str(args.downsample), '--cell_type'] + selected_cell_types
             if getattr(args, 'force'): cmd.append('--force')
             cicero_submitter.add(' '.join(cmd))
 
