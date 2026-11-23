@@ -130,13 +130,13 @@ run.cicero = function(args) { # run_cicero is a cicero package function so use d
     }
 
     # run cicero
-    if (! file.exists(paste0(args$out, '.cicero.connections.txt')) | args$force) {
+    if (! file.exists(paste0(args$out, '.cicero.connections.txt.gz')) | args$force) {
         connections = run_cicero(cicero_cds,genomic_coords = genome.df)
-        connections %>% write_tsv(paste0(args$out, '.cicero.connections.txt'))
+        connections %>% write_tsv(paste0(args$out, '.cicero.connections.txt.gz'))
     } else {
-        connections = read_tsv(paste0(args$out, '.cicero.connections.txt'), col_types = cols())
+        connections = read_tsv(paste0(args$out, '.cicero.connections.txt.gz'), col_types = cols())
     }
-    message('Cicero connections saved to: ', paste0(args$out, '.cicero.connections.txt'))
+    message('Cicero connections saved to: ', paste0(args$out, '.cicero.connections.txt.gz'))
 
     # identify cis co-accessible networks (CCANs)
     if (! file.exists(paste0(args$out, '.cicero.ccans.txt')) | args$force) {

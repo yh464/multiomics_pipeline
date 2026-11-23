@@ -33,6 +33,57 @@ from _utils.path import project, toolbox
 proj = project()
 tool = toolbox()
 
+# region: greatpy enrichment of sets of peaks
+def _load_go_df():
+    # target format: id, name, symbol (one symbol per row, multiple genes in the same GO term will be split into multiple rows)
+    # source file name is just the database name e.g. GOBP_2026
+    # source file format: name (contains spaces), gene, gene, etc. separated by tabs
+    go_files = os.listdir(tool['go'])
+    out_df = []
+    for file in go_files:
+        dataset = file.split('.')[0]
+        f = open(file).read().splitlines()
+        for line in f:
+            line = line.split('\t')
+            name = line[0]
+            if name.find('(GO:') > -1:
+                _id = f'{dataset}:' + re.search(r'\((GO:\d+)\)', name).group(1)
+                # drop the id from the name
+                name = re.sub(r'\s*\(GO:\d+\)', '', name)
+            else: _id = f'{dataset}:{name}'
+            genes = line[1:]
+            out_df.append(pd.DataFrame({'id': _id, 'name': name, 'symbol': genes}))
+    return pd.concat(out_df, ignore_index = True)
+
+def _greatpy_enrichment_single_set(args):
+    import greatpy as great
+    name, peak_set, regdom_df, size_df, go_df = args
+    out = great.enrichment(peak_set, regdom_file = regdom_df, chrsize_file = size_df, annotation_file = go_df)
+    out.insert(0, 'set_name', name)
+    out.insert(1, 'n_peaks', len(peak_set))
+    return out
+
+def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
+    import greatpy as great
+    import pyranges as pr
+
+    if species in ['hg19', 'hg38']: species = 'human/' + species
+    regdom_file = os.path.join(tool['greatpy'], 'data', species, 'regulatory_domain.bed')
+    chrsize_file = os.path.join(tool['greatpy'], 'data', species, 'chr_size.bed')
+    _, regdom_df, size_df, _ = great.tl.loader(None, regdom_file, chrsize_file, None)
+
+    if go_df is None: go_df = _load_go_df()
+
+    args_list = [(name, peak_set.as_df() if isinstance(peak_set, pr.PyRanges) else peak_set, 
+        regdom_df, size_df, go_df) for name, peak_set in peak_dict.items()]
+
+    with Pool(processes = min(len(peak_dict), n_cpu)) as pool:
+        results = list(tqdm(pool.imap(_greatpy_enrichment_single_set, args_list), total = len(peak_dict), desc = 'Running GREAT enrichment'))
+
+    results = pd.concat(results, ignore_index = True)
+    return results
+# endregion
+
 # region: cisTopic pipeline
 def check_cistopic_complete(dataset, prefix, n_components = range(25, 501, 25), niter = 100):
     outdir = os.path.dirname(proj.to_pathname('atac_programmes_cistopic', dataset, prefix))
@@ -396,6 +447,12 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     #     ).assign(topic = topic) for topic, topic_dict in topics_pygreat.items()])
     # topics_pygreat_df.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.pyGREAT.txt', sep = '\t', index = False)
 
+    # alternative pipeline: greatpy (using locally built databases)
+    topics_greatpy = greatpy_enrichment_batch(binarised_topics_pr_unfiltered, species = 'hg38')
+    topics_greatpy.to_csv(f'{outdir}/{prefix}.cistopic.k_{k_optim}.greatpy.txt', sep = '\t', index = False)
+    dar_greatpy = greatpy_enrichment_batch(dar_pr_unfiltered, species = 'hg38')
+    dar_greatpy.to_csv(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.greatpy.txt', sep = '\t', index = False)
+
     # drop all topics / DARs with fewer than 1000 peaks, or pycisTarget may raise an error
     binarised_topics_pr = {}; dar_pr = {}
     for topic, peaks in binarised_topics_pr_unfiltered.items():
@@ -489,7 +546,7 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
         log.log(f'Running scOpen model for {dataset}/{prefix} with {k} components', calling_file = 'run_scopen')
         nmf_output = run_nmf((adata_tfidf.X.T, k, 1, 200, 1, seed, 'nndsvd')) # alpha = 1, 200 iters, verbose = 1
         W = pd.DataFrame(nmf_output[0], index = adata_tfidf.var_names, columns = [f'F{i}' for i in range(1, k + 1)])
-        H = pd.DataFrame(nmf_output[1], index = [f'F{i}' for i in range(1, k + 1)], columns = adata_tfidf.obs_names)
+        H = pd.DataFrame(nmf_output[1].T, index = adata_tfidf.obs_names, columns = [f'F{i}' for i in range(1, k + 1)])
         error = nmf_output[2]
         W.to_csv(f'{outdir}/temp/{prefix}.scopen.k_{k}.weights.txt', sep = '\t')
         H.to_csv(f'{outdir}/temp/{prefix}.scopen.k_{k}.scores.txt', sep = '\t')
@@ -512,6 +569,19 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     if not os.path.islink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.scores.txt'):
         mv_symlink(f'{outdir}/temp/{prefix}.scopen.k_{kl.knee}.scores.txt', f'{outdir}/{prefix}.scopen.k_{kl.knee}.scores.txt')
     log.log(f'Automatically selecting {kl.knee} components for {dataset}/{prefix} based on knee point of reconstruction error', calling_file = 'run_scopen')
+
+    # extract top 3000 peaks per factor and run greatpy
+    import pyranges as pr
+    if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt') or force):
+        W = pd.read_table(f'{outdir}/{prefix}.scopen.k_{kl.knee}.weights.txt', index_col = 0)
+        top_peaks = {f'F{i}': W[f'F{i}'].sort_values(ascending = False).head(top) for i in range(1, kl.knee + 1)}
+        top_peaks_pr = {topic: pr.PyRanges(
+            chromosomes = peaks.index.str.split(':|-').str[0],
+            starts = peaks.index.str.split(':|-').str[1].astype(int),
+            ends = peaks.index.str.split(':|-').str[2].astype(int))
+            for topic, peaks in top_peaks.items()}
+        greatpy_results = greatpy_enrichment_batch(top_peaks_pr, species = 'hg38')
+        greatpy_results.to_csv(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt', sep = '\t', index = False)
 # endregion
 
 @log.profile
