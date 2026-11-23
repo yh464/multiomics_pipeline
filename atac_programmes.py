@@ -58,7 +58,7 @@ def _load_go_df():
 def _greatpy_enrichment_single_set(args):
     import greatpy as great
     name, peak_set, regdom_df, size_df, go_df = args
-    out = great.enrichment(peak_set, regdom_file = regdom_df, chrsize_file = size_df, annotation_file = go_df)
+    out = great.tl.enrichment(peak_set, regdom_file = regdom_df, chrsize_file = size_df, annotation_file = go_df)
     out.insert(0, 'set_name', name)
     out.insert(1, 'n_peaks', len(peak_set))
     return out
