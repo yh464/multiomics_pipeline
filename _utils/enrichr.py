@@ -115,11 +115,8 @@ def enrichr_list(genes, background = None, databases =
     out = out.loc[out.p_val < 0.05, :].sort_values(by = 'p_val').reset_index(drop = True)
     return out
 
-def enrichr_continuous(df, gene_col = None,
-    top = -1, by = None, cutoff = None, top_negative = True, databases =
-    ['GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 'SynGO_2024'],
-    use_background = True, silent = False
-    ):
+def enrichr_continuous(df, gene_col = None, top = -1, by = None, cutoff = None, top_negative = True, use_background = True, silent = False, 
+    databases = ['GO_Biological_Process_2025', 'GO_Cellular_Component_2025', 'GO_Molecular_Function_2025', 'SynGO_2024']):
     if isinstance(df, pd.Series): df = df.to_frame()
     if df.shape[1] == 1: by = df.columns[0]
     cutoff = abs(cutoff) if cutoff != None else None

@@ -31,15 +31,25 @@ mpl.rcParams['font.family'] = 'Arial'
 # region: factor downstream analyses
 def factor_enrichr(scores, top_negative = True, top = [100, 200, 500, 1000, 2000]):
     from _utils.enrichr import enrichr_continuous
-    out = []
-    for col in scores.columns:
-        for t in top:
-            log.log(f'Enrichr analysis for factor {col} on top {t} genes', calling_file = 'factor_enrichr')
-            enrichr_res = enrichr_continuous(scores, gene_col = 'index', by = col, top = t, top_negative = top_negative, 
-                use_background = False, silent = True)
-            enrichr_res.insert(0, 'factor', col)
-            enrichr_res['top'] = t
-            out.append(enrichr_res)
+    # out = []
+    # for col in scores.columns:
+    #     for t in top:
+    #         log.log(f'Enrichr analysis for factor {col} on top {t} genes', calling_file = 'factor_enrichr')
+    #         enrichr_res = enrichr_continuous(scores, gene_col = 'index', top = t, by = col,  top_negative = top_negative, 
+    #             use_background = False, silent = True)
+    #         enrichr_res.insert(0, 'factor', col)
+    #         enrichr_res['top'] = t
+    #         out.append(enrichr_res)
+
+    # convert above to a parallelised version
+    tasks = [(scores, 'index', t, col, None, top_negative, False, True) for col in scores.columns for t in top]
+    with Pool(8) as pool:
+        out = list(tqdm(pool.starmap(enrichr_continuous, tasks), total = len(tasks), desc = 'Enrichr analysis for all factors'))
+    for i, (col, t) in enumerate([(col, t) for col in scores.columns for t in top]):
+        enrichr_res = out[i]
+        enrichr_res.insert(0, 'factor', col)
+        enrichr_res['top'] = t
+        out[i] = enrichr_res
     out = pd.concat(out, axis = 0)
     return out
 
