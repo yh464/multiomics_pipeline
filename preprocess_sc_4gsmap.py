@@ -1,8 +1,9 @@
 import os
 from _utils.logger import logger
 log = logger()
-from _utils.path import project
+from _utils.path import project, toolbox
 proj = project()
+tool = toolbox()
 from _utils.adatatools import check_spatial
 
 def main(args):
@@ -10,8 +11,7 @@ def main(args):
     out_dir = '/rds/project/rds-Nl99R8pHODQ/multiomics/gsmap'
     h5ad_raw = proj.find_h5ad(args.datasets, normalised = False)
 
-    submitter = array_submitter(n_cpu = 16, timeout = 720, name = 'preprocess_sc_4gsmap',
-        env = '/rds/project/rds-Nl99R8pHODQ/toolbox/gsmap')
+    submitter = array_submitter(n_cpu = 16, timeout = 720, name = 'preprocess_sc_4gsmap', env = tool['gsmap'])
 
     for dataset, prefix in h5ad_raw:
         if not check_spatial(dataset, prefix): continue

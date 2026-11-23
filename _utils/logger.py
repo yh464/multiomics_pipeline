@@ -58,7 +58,9 @@ class logger():
         if self.echo and self.file != sys.stdout: print(msg, flush = True)
     
     def warn(self, msg, calling_file = None): self.log(msg, warning = True, calling_file = calling_file)
-    def error(self, msg, calling_file = None): self.log(msg, error = True, calling_file = calling_file)
+    def error(self, msg, calling_file = None): 
+        self.log(msg, error = True, calling_file = calling_file)
+        raise RuntimeError(msg)
     def info(self, msg, calling_file = None): self.log(msg, info = True, calling_file = calling_file)
 
     def system(self, cmd, calling_file = None):

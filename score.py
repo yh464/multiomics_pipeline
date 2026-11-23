@@ -21,7 +21,8 @@ log = logger()
 from _utils.path import project
 proj = project()
 
-def segidx(df, n):
+# region: Cepo pipeline
+def _segidx(df, n):
     nz = df['nz']/n
     ms = df['s']/n; ms[ms==0] = np.nan
     sds = ((df['sumsq']/n - ms**2) * n/(n-1)) ** 0.5
@@ -30,7 +31,7 @@ def segidx(df, n):
     x2 = 1 - cvs.rank()/(len(cvs)+1)
     return (x1 + x2)/2
 
-def generate_tempfile(adata, subset, block_size = 50000):
+def _generate_tempfile(adata, subset, block_size = 50000):
     if adata[subset,:].shape[0] > block_size:
         from time import perf_counter as t
         tic = t()
@@ -38,7 +39,7 @@ def generate_tempfile(adata, subset, block_size = 50000):
         cells = adata[subset,:].obs_names.to_numpy()
         for i in range(0, adata[subset,:].shape[0], block_size):
             log.log(f'Processing block {i}-{min(i+block_size, adata[subset,:].shape[0])} of {adata[subset,:].shape[0]}, time = {t()-tic:.2f}s')
-            temp = generate_tempfile(adata, cells[i:min(i+block_size, adata[subset,:].shape[0])], block_size = block_size)
+            temp = _generate_tempfile(adata, cells[i:min(i+block_size, adata[subset,:].shape[0])], block_size = block_size)
             df += temp; del temp
         return df
     mat = adata[subset,:].to_memory().X
@@ -68,7 +69,7 @@ def singlebatchcepo(adata, genes, celltypes, mincells = 20, exprspct:float = 0.0
     for ct in tqdm(celltypes_df.columns, desc = 'Generating temporary files', total = celltypes_df.shape[1]):
         tempfile = f'{tempdir}/cepo.{ct}.txt'
         if not os.path.isfile(tempfile):
-            generate_tempfile(adata, celltypes_df[ct].values).to_csv(tempfile, sep = '\t', index = True, header = True)
+            _generate_tempfile(adata, celltypes_df[ct].values).to_csv(tempfile, sep = '\t', index = True, header = True)
 
     # filter genes such that each gene is expressed in at least exprspct of cells in at least one cell type
     keep = pd.DataFrame(index = genes, columns = celltypes_df.columns, data = False)
@@ -85,7 +86,7 @@ def singlebatchcepo(adata, genes, celltypes, mincells = 20, exprspct:float = 0.0
         tempfile = f'{tempdir}/cepo.{ct}.txt'
         temp = pd.read_table(tempfile, index_col = 0)
         temp.index = genes
-        segmat[ct] = segidx(temp.loc[keep, :], celltypes_df[ct].sum())
+        segmat[ct] = _segidx(temp.loc[keep, :], celltypes_df[ct].sum())
     
     out = pd.DataFrame(index = genes, columns = celltypes_df.columns, data = float(0))
     for ct in celltypes_df.columns:
@@ -126,6 +127,7 @@ def run_cepo(args):
     out_dfs.index.name = 'gene'
     out_dfs.to_csv(out_file, sep = '\t', index = True, header = True)
     return out_dfs
+# endregion
 
 def main(args):
     if args.cepo: return run_cepo(args)
