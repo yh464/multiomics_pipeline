@@ -29,7 +29,7 @@ sns.set_theme(style = 'ticks', font_scale = 1.2, palette = 'colorblind')
 mpl.rcParams['font.family'] = 'Arial'
 
 # region: factor downstream analyses
-def factor_enrichr(scores, top_negative = True, top = [50, 100, 200, 300, 500]):
+def factor_enrichr(scores, top_negative = True, top = [100, 200, 500, 1000, 2000]):
     from _utils.enrichr import enrichr_continuous
     out = []
     for col in scores.columns:
@@ -440,7 +440,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     # consensus factor decomposition
     log.log(f'Conducting consensus factor decomposition with k = {k_optim} and density threshold = {density_threshold}', calling_file = 'run_cnmf')
     density_threshold_str = str(density_threshold).replace('.','_')
-    if not os.path.isfile(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str)) or force:
+    if not os.path.isfile(cnmf_obj.paths['gene_spectra_score__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str)) or force:
         cnmf_obj.consensus(k = k_optim, density_threshold = density_threshold)
     
     # publication-quality PDF incorporating scree plot and local density histogram
