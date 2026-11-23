@@ -158,8 +158,8 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
         if emb_name == 'tsne': emb_name = 'tSNE'
         tasks = [
             (col, scores, adata.obsm[emb_key], emb_name, 
-            out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', '')),
-            vmax, force) for col in score_cols
+            figname := out_fig.replace('$factor', col).replace('$embedding', emb_key.replace('X_', '')),
+            vmax, force) for col in score_cols if not os.path.isfile(figname) or force
         ]
         pool = Pool(min(max(cpu_count(), 8), len(tasks)))
         try: _ = list(tqdm(pool.imap(_plot_factor_embedding, tasks), total = len(tasks),
@@ -197,10 +197,10 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
         scores_tmp = pd.concat([scores, adata.obs[[cell_type_key, time_key]]], axis = 1).dropna()  
         tasks = [
             (scores_tmp, time_key, col, cell_type_key, time_xlabel,
-             out_fig.replace('$factor', col).replace('$timekey', time_key),
-             out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.pdf', '_order2.pdf').replace('.png', '_order2.png'),
+             fig_1order := out_fig.replace('$factor', col).replace('$timekey', time_key),
+             fig_2order := out_fig.replace('$factor', col).replace('$timekey', time_key).replace('.pdf', '_order2.pdf').replace('.png', '_order2.png'),
              force)
-            for col in score_cols
+            for col in score_cols if not os.path.isfile(fig_1order) or not os.path.isfile(fig_2order) or force
         ]
         pool = Pool(min(max(cpu_count(), 8), len(tasks)))
         try: _ = list(tqdm(pool.imap(_plot_factor_time_reg, tasks), total = len(tasks),
