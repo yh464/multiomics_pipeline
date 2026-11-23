@@ -162,6 +162,7 @@ def factor_embedding(scores, adata, out_fig, embedding_key = ['X_umap'], force =
             vmax, force) for col in score_cols
         ]
         tasks = [task for task in tasks if not os.path.isfile(task[4]) or force]
+        if len(tasks) == 0: continue
         pool = Pool(min(max(cpu_count(), 8), len(tasks)))
         try: _ = list(tqdm(pool.imap(_plot_factor_embedding, tasks), total = len(tasks),
                 desc = f'Plotting factor embedding regression in {emb_key} space'))
@@ -204,6 +205,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
             for col in score_cols
         ]
         tasks = [task for task in tasks if not (os.path.isfile(task[5]) and os.path.isfile(task[6]) and not force)]
+        if len(tasks) == 0: continue
         pool = Pool(min(max(cpu_count(), 8), len(tasks)))
         try: _ = list(tqdm(pool.imap(_plot_factor_time_reg, tasks), total = len(tasks),
                 desc = f'Plotting factor temporal regression for {time_key}'))
