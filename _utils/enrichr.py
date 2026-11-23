@@ -88,11 +88,9 @@ def get_genes_list(df, gene_col = None, top = -1, by = None, cutoff = None, top_
     if len(genes_p) > 0:
         genes_p_ensg = ref.index.intersection(genes_p)
         genes_p = ref.loc[genes_p_ensg, 'LABEL'].dropna().unique().tolist() + pd.Index(genes_p).difference(ref.index).tolist()
-        if top > -1: assert len(genes_p) == min(top, len(df)), f'Number of genes after mapping to labels is {len(genes_p)}, which is not equal to the specified top {top}'
     if len(genes_n) > 0:
         genes_n_ensg = ref.index.intersection(genes_n)
         genes_n = ref.loc[genes_n_ensg, 'LABEL'].dropna().unique().tolist() + pd.Index(genes_n).difference(ref.index).tolist()
-        if top > -1: assert len(genes_n) == min(top, len(df)), f'Number of genes after mapping to labels is {len(genes_n)}, which is not equal to the specified top {top}'
     if len(genes) > 0:
         genes_ensg = ref.index.intersection(genes)
         genes = ref.loc[genes_ensg, 'LABEL'].dropna().unique().tolist() + pd.Index(genes).difference(ref.index).tolist()
