@@ -8,25 +8,23 @@ Python pipelines to identify gene programmes from scATAC-seq data
 '''
 
 # scanpy takes long to import so needs to be imported in each sub-function
+import os, time, pickle, glob, re
+from multiprocessing import Pool
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import seaborn as sns
-import os, time, pickle, glob, re
-from fnmatch import fnmatch
-from multiprocessing import cpu_count, Pool
 from tqdm import tqdm
-from _utils.adatatools import subset_h5ad, downsample_adata
+import matplotlib.pyplot as plt
+# import matplotlib as mpl
+# import seaborn as sns
+# from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
+# from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
+# from _plots.regplot import temporal_regplot
+# sns.set_theme(style = 'ticks', font_scale = 1.2, palette = 'colorblind')
+# mpl.rcParams['font.family'] = 'Arial'
+
+from _utils.adatatools import downsample_adata
 from _utils.slurm import get_slurm_config
 n_cpu, mem = get_slurm_config() # memory in MB
-
-from _plots.corr_heatmap import corr_heatmap, corr_heatmap_wide_format
-from _plots.colourcode_scatterplot import scatterplot_noaxis, scatterplot_adata
-from _plots.regplot import temporal_regplot
-sns.set_theme(style = 'ticks', font_scale = 1.2, palette = 'colorblind')
-mpl.rcParams['font.family'] = 'Arial'
-
 from _utils.logger import logger
 log = logger()
 from _utils.path import project, toolbox
@@ -69,9 +67,9 @@ def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
     if species in ['hg19', 'hg38']: species = 'human/' + species
     regdom_file = os.path.join(tool['greatpy'], 'data', species, 'regulatory_domain.bed')
     chr_size_file = os.path.join(tool['greatpy'], 'data', species, 'chr_size.bed')
-    _, regdom_df, size_df, _ = great.tl.loader(None, regdom_file, chr_size_file, None)
-
     if go_df is None: go_df = _load_go_df()
+    go_df.insert(2, 'dummy', pd.NA) # add a dummy column to match the expected format of greatpy
+    _, regdom_df, size_df, go_df = great.tl.loader(None, regdom_file, chr_size_file, go_df)
 
     args_list = [(name, peak_set.as_df() if not isinstance(peak_set, pd.DataFrame) else peak_set, # no dependency on pyranges if peak_set is DataFrame
         regdom_df, size_df, go_df) for name, peak_set in peak_dict.items()]
@@ -604,10 +602,6 @@ def add_cmd_args(parser):
         help = 'Number of components to identify for cistopic (start, stop, step), default: 5 to 125 in steps of 5')
     parser.add_argument('--cistopic_alpha', type = float, default = 50, help = 'Alpha parameter for cistopic (default: 50)')
     parser.add_argument('--cistopic_eta', type = float, default = 0.1, help = 'Eta parameter for cistopic (default: 0.1)')
-    # parser.add_argument('--mallet', default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/mallet/bin/mallet',
-    #     help = 'Path to mallet binary for cistopic. (default: /rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/mallet/bin/mallet)')
-    # parser.add_argument('--scenic_db', help = 'SCENIC+ database directory for pycisTarget; KEEP DEFAULT FILE NAMES',
-    #     default = '/rds/project/rds-Nl99R8pHODQ/toolbox/scenicplus/databases')
 
     parser.add_argument('--scopen', action = 'store_true', help = 'Run scOpen to identify gene programmes')
     parser.add_argument('--scopen_components', type = int, nargs = '+', default = [5, 125, 5],
