@@ -230,7 +230,7 @@ def factor_time_reg(scores, adata, out_fig, cell_type_key, time_keys = ['pseudot
 # endregion
 
 # region: cnmf pipeline
-def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir = None):
+def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force):
     loadings = loadings.T
     cell_type = [x.lower() for x in cell_type if x in adata.obs.columns]
     adata.obs.columns = adata.obs.columns.str.lower()
@@ -274,13 +274,6 @@ def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim,
         enrichr_res = factor_enrichr(loadings, top_negative = False)
         enrichr_res.to_csv(out_enrichr, sep = '\t', index = False, header = True)
     log.log(f'cNMF factor enrichment analysis saved to {out_enrichr}', calling_file = 'run_cnmf')
-
-    if savedir is not None:
-        os.makedirs(savedir, exist_ok = True)
-        loadings.index.name = 'gene'
-        loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
-        loadings.to_csv(f'{savedir}/{prefix}.cnmf_k{k_optim}.txt', sep = '\t', index = True, header = True)
-        log.log(f'Formatted cNMF loadings for MAGMA GSEA analysis saved to {savedir}/{prefix}.cnmf_k{k_optim}.txt', calling_file = 'run_cnmf')
 
 def cnmf_project(dataset, prefix, cnmf_obj, h5ad_raw, 
         projection_dataset, projection_prefix, k, dt, 
@@ -517,9 +510,23 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     # downstream analyses
     usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
-    loadings = pd.read_table(cnmf_obj.paths['gene_spectra_tpm__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
+    loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
+    spectra_tpm = pd.read_table(cnmf_obj.paths['gene_spectra_tpm__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
+    # spectra_score = pd.read_table(cnmf_obj.paths['gene_spectra_score__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
-    cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir)
+    cnmf_downstream(usages, spectra_tpm, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir)
+
+    # export cNMF results in MAGMA format
+    if savedir is not None:
+        save_prefix = f'{savedir}/{prefix}.cnmf_k{k_optim}' if dataset in prefix else f'{savedir}/{dataset}_{prefix}.cnmf_k{k_optim}'
+        os.makedirs(savedir, exist_ok = True)
+        loadings.index.name = 'gene'
+        loadings.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}' for i in range(loadings.shape[1])]
+        loadings.to_csv(f'{save_prefix}.txt', sep = '\t', index = True, header = True)
+        spectra_tpm.index.name = 'gene'
+        spectra_tpm.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}.spectra_tpm' for i in range(spectra_tpm.shape[1])]
+        spectra_tpm.to_csv(f'{save_prefix}.spectra_tpm.txt', sep = '\t', index = True, header = True)
+        log.log(f'Formatted cNMF loadings for MAGMA GSEA analysis saved to {save_prefix}.txt and {save_prefix}.spectra_tpm.txt', calling_file = 'run_cnmf')
 
     # enforce projection using available loadings from projection_dataset/projection_prefix
     if len(projection) > 0:
