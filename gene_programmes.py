@@ -245,7 +245,7 @@ def cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim,
     out_enrichr = f'{outdir}/{prefix}/{prefix}_cnmf_k{k_optim}_enrichr.txt'
 
     # UMAP plot of cell-level scores
-    rep_names = [x for x in adata.obsm.keys() if x in embedding] # UMAP and tSNE should be included in upstream batch script
+    rep_names = [x for x in adata.obsm.keys() if x in ['X_umap', 'X_tsne'] + embedding]
     if len(rep_names) > 0: factor_embedding(usages, adata, f'{plot_dir}/{prefix}_cnmf_k{k_optim}_$factor_$embedding.pdf', 
         embedding_key = rep_names, force = force)
     else: log.warn('No embedding found in adata.obsm, skipping cNMF factor embedding plots.', calling_file = 'run_cnmf')
