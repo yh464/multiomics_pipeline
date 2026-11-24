@@ -58,7 +58,7 @@ def _load_go_df():
 def _greatpy_enrichment_single_set(args):
     import greatpy as great
     name, peak_set, regdom_df, size_df, go_df = args
-    out = great.tl.enrichment(peak_set, regdom_file = regdom_df, chrsize_file = size_df, annotation_file = go_df)
+    out = great.tl.enrichment(peak_set, regdom_file = regdom_df, chr_size_file = size_df, annotation_file = go_df)
     out.insert(0, 'set_name', name)
     out.insert(1, 'n_peaks', len(peak_set))
     return out
@@ -68,8 +68,8 @@ def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
 
     if species in ['hg19', 'hg38']: species = 'human/' + species
     regdom_file = os.path.join(tool['greatpy'], 'data', species, 'regulatory_domain.bed')
-    chrsize_file = os.path.join(tool['greatpy'], 'data', species, 'chr_size.bed')
-    _, regdom_df, size_df, _ = great.tl.loader(None, regdom_file, chrsize_file, None)
+    chr_size_file = os.path.join(tool['greatpy'], 'data', species, 'chr_size.bed')
+    _, regdom_df, size_df, _ = great.tl.loader(None, regdom_file, chr_size_file, None)
 
     if go_df is None: go_df = _load_go_df()
 
@@ -248,11 +248,11 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
         log.log(f'Identifying differentially accessible regions for {dataset}/{prefix}', calling_file = 'run_cistopic')
         imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
-        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx) # convert to sparse matrix to save memory
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
-        norm_imputed_obj.mtx = sparse.csr_matrix(norm_imputed_obj.mtx) # convert to sparse matrix to save memory
+        norm_imputed_obj.mtx = norm_imputed_obj.mtx.astype(np.float16) # convert to float16 to save memory
         hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
             n_bins = 20, n_top_features = None, plot = False)
+        del norm_imputed_obj
         log.log(f'Found {len(hvp)} highly variable peaks for {dataset}/{prefix}', calling_file = 'run_cistopic')
         for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset}/{prefix}'):
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
