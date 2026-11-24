@@ -517,7 +517,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
 
     # downstream analyses
     usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
-    loadings = pd.read_table(cnmf_obj.paths['gene_spectra_score__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
+    loadings = pd.read_table(cnmf_obj.paths['gene_spectra_tpm__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
     cnmf_downstream(usages, loadings, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir)
 
