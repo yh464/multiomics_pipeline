@@ -52,79 +52,92 @@ def _load_go_df():
             else: _id = f'{dataset}:{name}'
             genes = line[1:]
             out_df.append(pd.DataFrame({'id': _id, 'name': name, 'symbol': genes}))
-    return pd.concat(out_df, ignore_index = True)
+    
+    go_df = pd.concat(out_df, ignore_index = True)
+    go_df = go_df.drop_duplicates().dropna()
+    go_df = go_df.loc[go_df.symbol.str.strip() != '', :].copy() # drop rows with empty gene symbols
+    return go_df
 
 def _greatpy_enrichment_single_set(args):
     from scipy.stats import binom, hypergeom
 
     name, peak_df, regdom_df, size_df, go_df = args
+    go_df = go_df.drop_duplicates().dropna()
+    go_df = go_df.loc[go_df.symbol.str.strip() != '', :].copy() # drop rows with empty gene symbols
 
     # local implementation of GREATpy since the original package takes FOREVER
     # below implementation should be more than 1000 times faster
 
     # input conversion
     # peak_df must either be a pandas DataFrame or PyRanges object, with chromosome, start and end columns
-    if not isinstance(peak_df, pr.PyRanges):
-        peak_pr = pr.PyRanges(chromosomes = peak_df.iloc[:,0], starts = peak_df.iloc[:,1], ends = peak_df.iloc[:,2])
-    else: peak_pr = peak_df; peak_df = peak_df.as_df()
-    # regdom_df must be a pandas DataFrame containing chromosome, start, end, gene name, TSS and starnd columns
-    regdom_pr = pr.PyRanges(chromosomes = regdom_df.iloc[:,0], starts = regdom_df.iloc[:,1], ends = regdom_df.iloc[:,2],
-        gene = regdom_df.iloc[:,3], tss = regdom_df.iloc[:,4], strand = regdom_df.iloc[:,5])
+    if isinstance(peak_df, pr.PyRanges): peak_df = peak_df.as_df().copy()
+    else: peak_df = peak_df.copy()
+    peak_df.columns = ['Chromosome', 'Start', 'End']
+    peak_df['peak_id'] = peak_df['Chromosome'].astype(str) + ':' + peak_df['Start'].astype(str) + '-' + peak_df['End'].astype(str)
+    peak_pr = pr.PyRanges(peak_df)
 
-    # find overlap between input query and regulatory domains
-    overlap = peak_pr.join(regdom_pr)
+    # regdom_df must be a pandas DataFrame containing chromosome, start, end, gene name, TSS and starnd columns
+    regdom_df_orig = regdom_df; regdom_df = regdom_df.copy()
+    regdom_df.columns = ['Chromosome', 'Start', 'End', 'gene', 'tss', 'strand']
+    regdom_pr = pr.PyRanges(regdom_df)
+
+    # find names of genes associated with at least one genomic region
+    overlap = peak_pr.join(regdom_pr); overlap_df = overlap.as_df()
     if len(overlap) == 0: 
+        log.warn(f'Input test set {name} does not overlap with any regulatory domains of the genome')
         return pd.DataFrame(
             index = [],
             columns = ['set_name', 'n_peaks', 'id', 'go_term', 'binom_p_value', 'binom_fold_enrichment',
                 'hypergeom_p_value', 'hypergeom_fold_enrichment', 'intersection_size', 'recall'],
-            dtype = {'set_name': str, 'n_peaks': int, 'id': str, 'go_term': str, 'binom_p_value': float, 'binom_fold_enrichment': float,
-                'hypergeom_p_value': float, 'hypergeom_fold_enrichment': float, 'intersection_size': int, 'recall': float}
+            dtype = object
         )
-    peak_hits_per_gene = overlap.groupby('gene').size().to_dict()
+    overlap_genes = overlap_df['gene'].drop_duplicates().dropna().tolist() # same as "asso" variable in greatpy
 
-    # regulatory domain length per gene
-    regdom_pr['length'] = regdom_pr.lengths()
-    regdom_length = regdom_pr.groupby('gene')['length'].sum().to_dict()
-
-    # filter out only overlapping genes from the GO annotation dataframe
-    ann = go_df.loc[ann['symbol'].isin(regdom_pr['gene']), :].copy() 
-    go_to_genes = ann.groupby('id')['symbol'].apply(set).to_dict()
-    go_term_names = ann.groupby('id')['name'].first().to_dict()
+    # reduce the regulatory domain universe
+    ann_red = go_df.loc[go_df['symbol'].isin(overlap_genes), :].copy()
+    ann = go_df.loc[go_df['id'].isin(ann_red['id']), :].copy() # find all GO terms that have at least one gene in the overlap_genes list
+    keep_genes = set(ann['symbol'])
+    regdom_df = regdom_df[regdom_df['gene'].isin(keep_genes)]
+    regdom_pr = pr.PyRanges(regdom_df)
+    regdom_df['length'] = regdom_df['End'] - regdom_df['Start']
 
     # stats
-    total_genome_bp = size_df.iloc[:,1].sum()
-    n_peaks = len(peak_pr)
-    genome_genes = set(regdom_pr['gene']); n_genome = len(genome_genes)
-    overlap_genes = set(overlap['gene']); n_overlap = len(overlap_genes)
+    # number of overlapping peaks for each gene
+    gene_to_peaks = overlap_df.groupby('gene')['peak_id'].apply(set).to_dict()
+    # NB the original GREATpy implementation has a bug, it determines the overlap in the stage above (finding overlap_genes)
+    # requiring any interval overlap, but in the number_of_hits functions it requires the peaks to be completely within the regulatory domain
+    # this behaviour is not consistent with the original GREAT implementation or the rGREAT package
+    # using the same definition of peak - regulatory domain overlap throughout this script
+    go_to_genes = ann.groupby('id')['symbol'].apply(set).to_dict()
+    go_to_terms = ann.groupby('id')['name'].first().to_dict()
+    go_to_peaks = {go_id: set().union(*[gene_to_peaks.get(gene, set()) for gene in genes]) for go_id, genes in go_to_genes.items()}
+
+    # quantities for global use
+    n_genome = len(regdom_df_orig) # total number of genes for hypergeometric test, should be equal to len(keep_genes)
+    n_binom = len(peak_pr) # total number of peaks in the test set for binomial test
+    total_nu = size_df.iloc[:,1].sum() # total number of bases in the genome for binomial test
 
     out = []
-    for go_id, genes in go_to_genes.items():
-        genes = genes & genome_genes # intersection between GO term genes and all genes with available annotation
-        if len(genes) == 0: 
-            log.warn(f'GO term {go_id}: {go_term_names[go_id]} does not overlap with annotation, skipping', calling_file = 'greatpy_enrichment')
-            continue
-        go_overlap = genes & overlap_genes # intersection between GO term genes and genes overlapping with input peaks
-        if len(go_overlap) == 0: continue # no warning as peaks may not overlap with any genes in the GO term
+    for go_id in ann['id'].unique():
+        go_term = go_to_terms[go_id]
+        K_hypergeom = len(go_to_genes[go_id]) # number of genes associated with the GO term
+        current_regdom_df = regdom_df[regdom_df['gene'].isin(go_to_genes[go_id])]
+        k_hypergeom = len(set(current_regdom_df['gene']).intersection(overlap_genes)) # number of genes in the test set associated with the GO term
 
-        # binomial test
-        observed_hits = sum([peak_hits_per_gene.get(gene, 0) for gene in go_overlap])
-        annotated_bp = sum([regdom_length.get(gene, 0) for gene in genes])
-        binom_p_value = binom.sf(observed_hits - 1, n_peaks, annotated_bp / total_genome_bp)
-        binom_fold_enrichment = min((observed_hits / n_peaks) / (annotated_bp / total_genome_bp), 1e10)
-
-        # hypergeometric test
-        hypergeom_p_value = hypergeom.sf(len(go_overlap) - 1, n_genome, len(genes), n_overlap)
-        hypergeom_fold_enrichment = min((len(go_overlap) / n_overlap) / (len(genes) / n_genome), 1e10)
+        k_binom = len(go_to_peaks[go_id]) # number of peaks in the test set associated with the GO term
+        nb_binom = current_regdom_df['length'].sum() # total number of bases in the regulatory domains associated with the GO term
 
         out.append(pd.DataFrame(dict(
-            set_name = name, n_peaks = n_peaks, id = go_id, go_term = go_term_names[go_id],
-            binom_p_value = binom_p_value, binom_fold_enrichment = binom_fold_enrichment,
-            hypergeom_p_value = hypergeom_p_value, hypergeom_fold_enrichment = hypergeom_fold_enrichment,
-            intersection_size = len(go_overlap), recall = len(go_overlap) / len(genes)
+            set_name = [name], n_peaks = n_binom, id = go_id, go_term = go_term,
+            binom_p_value = binom.sf(k_binom - 1, n_binom, nb_binom / total_nu), # survival function = 1 - cdf
+            binom_fold_enrichment = (k_binom * total_nu) / nb_binom if nb_binom > 0 else 2**63-1,
+            hypergeom_p_value = hypergeom.sf(k_hypergeom - 1, n_genome, K_hypergeom, len(overlap_genes)), # survival function = 1 - cdf
+            hypergeom_fold_enrichment = (k_hypergeom * n_genome) / (K_hypergeom * len(overlap_genes)) if K_hypergeom > 0 else 2**63-1,
+            intersection_size = k_binom, recall = k_binom / K_hypergeom if K_hypergeom > 0 else np.nan
         )))
 
     out = pd.concat(out, ignore_index = True)
+    out = out.sort_values(['binom_p_value', 'hypergeom_p_value']).reset_index(drop = True)
     # out = great.tl.enrichment(peak_df, regdom_file = regdom_df, chr_size_file = size_df, annotation_file = go_df)
     return out
 
@@ -135,7 +148,7 @@ def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
     regdom_file = os.path.join(tool['greatpy'], 'data', species, 'regulatory_domain.bed')
     chr_size_file = os.path.join(tool['greatpy'], 'data', species, 'chr_size.bed')
     if go_df is None: go_df = _load_go_df()
-    go_df.insert(2, 'dummy', pd.NA) # add a dummy column to match the expected format of greatpy
+    # go_df.insert(2, 'dummy', pd.NA) # add a dummy column to match the expected format of greatpy
     _, regdom_df, size_df, _ = great.tl.loader(None, regdom_file, chr_size_file, None)
 
     args_list = [(name, peak_set, regdom_df, size_df, go_df) for name, peak_set in peak_dict.items()]
