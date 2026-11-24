@@ -12,6 +12,7 @@ import os, time, pickle, glob, re
 from multiprocessing import Pool
 import numpy as np
 import pandas as pd
+import pyranges as pr
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 # import matplotlib as mpl
@@ -54,11 +55,77 @@ def _load_go_df():
     return pd.concat(out_df, ignore_index = True)
 
 def _greatpy_enrichment_single_set(args):
-    import greatpy as great
-    name, peak_set, regdom_df, size_df, go_df = args
-    out = great.tl.enrichment(peak_set, regdom_file = regdom_df, chr_size_file = size_df, annotation_file = go_df)
-    out.insert(0, 'set_name', name)
-    out.insert(1, 'n_peaks', len(peak_set))
+    from scipy.stats import binom, hypergeom
+
+    name, peak_df, regdom_df, size_df, go_df = args
+
+    # local implementation of GREATpy since the original package takes FOREVER
+    # below implementation should be more than 1000 times faster
+
+    # input conversion
+    # peak_df must either be a pandas DataFrame or PyRanges object, with chromosome, start and end columns
+    if not isinstance(peak_df, pr.PyRanges):
+        peak_pr = pr.PyRanges(chromosomes = peak_df.iloc[:,0], starts = peak_df.iloc[:,1], ends = peak_df.iloc[:,2])
+    else: peak_pr = peak_df; peak_df = peak_df.as_df()
+    # regdom_df must be a pandas DataFrame containing chromosome, start, end, gene name, TSS and starnd columns
+    regdom_pr = pr.PyRanges(chromosomes = regdom_df.iloc[:,0], starts = regdom_df.iloc[:,1], ends = regdom_df.iloc[:,2],
+        gene = regdom_df.iloc[:,3], tss = regdom_df.iloc[:,4], strand = regdom_df.iloc[:,5])
+
+    # find overlap between input query and regulatory domains
+    overlap = peak_pr.join(regdom_pr)
+    if len(overlap) == 0: 
+        return pd.DataFrame(
+            index = [],
+            columns = ['set_name', 'n_peaks', 'id', 'go_term', 'binom_p_value', 'binom_fold_enrichment',
+                'hypergeom_p_value', 'hypergeom_fold_enrichment', 'intersection_size', 'recall'],
+            dtype = {'set_name': str, 'n_peaks': int, 'id': str, 'go_term': str, 'binom_p_value': float, 'binom_fold_enrichment': float,
+                'hypergeom_p_value': float, 'hypergeom_fold_enrichment': float, 'intersection_size': int, 'recall': float}
+        )
+    peak_hits_per_gene = overlap.groupby('gene').size().to_dict()
+
+    # regulatory domain length per gene
+    regdom_pr['length'] = regdom_pr.lengths()
+    regdom_length = regdom_pr.groupby('gene')['length'].sum().to_dict()
+
+    # filter out only overlapping genes from the GO annotation dataframe
+    ann = go_df.loc[ann['symbol'].isin(regdom_pr['gene']), :].copy() 
+    go_to_genes = ann.groupby('id')['symbol'].apply(set).to_dict()
+    go_term_names = ann.groupby('id')['name'].first().to_dict()
+
+    # stats
+    total_genome_bp = size_df.iloc[:,1].sum()
+    n_peaks = len(peak_pr)
+    genome_genes = set(regdom_pr['gene']); n_genome = len(genome_genes)
+    overlap_genes = set(overlap['gene']); n_overlap = len(overlap_genes)
+
+    out = []
+    for go_id, genes in go_to_genes.items():
+        genes = genes & genome_genes # intersection between GO term genes and all genes with available annotation
+        if len(genes) == 0: 
+            log.warn(f'GO term {go_id}: {go_term_names[go_id]} does not overlap with annotation, skipping', calling_file = 'greatpy_enrichment')
+            continue
+        go_overlap = genes & overlap_genes # intersection between GO term genes and genes overlapping with input peaks
+        if len(go_overlap) == 0: continue # no warning as peaks may not overlap with any genes in the GO term
+
+        # binomial test
+        observed_hits = sum([peak_hits_per_gene.get(gene, 0) for gene in go_overlap])
+        annotated_bp = sum([regdom_length.get(gene, 0) for gene in genes])
+        binom_p_value = binom.sf(observed_hits - 1, n_peaks, annotated_bp / total_genome_bp)
+        binom_fold_enrichment = min((observed_hits / n_peaks) / (annotated_bp / total_genome_bp), 1e10)
+
+        # hypergeometric test
+        hypergeom_p_value = hypergeom.sf(len(go_overlap) - 1, n_genome, len(genes), n_overlap)
+        hypergeom_fold_enrichment = min((len(go_overlap) / n_overlap) / (len(genes) / n_genome), 1e10)
+
+        out.append(pd.DataFrame(dict(
+            set_name = name, n_peaks = n_peaks, id = go_id, go_term = go_term_names[go_id],
+            binom_p_value = binom_p_value, binom_fold_enrichment = binom_fold_enrichment,
+            hypergeom_p_value = hypergeom_p_value, hypergeom_fold_enrichment = hypergeom_fold_enrichment,
+            intersection_size = len(go_overlap), recall = len(go_overlap) / len(genes)
+        )))
+
+    out = pd.concat(out, ignore_index = True)
+    # out = great.tl.enrichment(peak_df, regdom_file = regdom_df, chr_size_file = size_df, annotation_file = go_df)
     return out
 
 def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
@@ -69,10 +136,9 @@ def greatpy_enrichment_batch(peak_dict, species = 'hg38', go_df = None):
     chr_size_file = os.path.join(tool['greatpy'], 'data', species, 'chr_size.bed')
     if go_df is None: go_df = _load_go_df()
     go_df.insert(2, 'dummy', pd.NA) # add a dummy column to match the expected format of greatpy
-    _, regdom_df, size_df, go_df = great.tl.loader(None, regdom_file, chr_size_file, go_df)
+    _, regdom_df, size_df, _ = great.tl.loader(None, regdom_file, chr_size_file, None)
 
-    args_list = [(name, peak_set.as_df() if not isinstance(peak_set, pd.DataFrame) else peak_set, # no dependency on pyranges if peak_set is DataFrame
-        regdom_df, size_df, go_df) for name, peak_set in peak_dict.items()]
+    args_list = [(name, peak_set, regdom_df, size_df, go_df) for name, peak_set in peak_dict.items()]
 
     with Pool(processes = min(len(peak_dict), n_cpu)) as pool:
         results = list(tqdm(pool.imap(_greatpy_enrichment_single_set, args_list), total = len(peak_dict), desc = 'Running GREAT enrichment'))
@@ -356,7 +422,6 @@ def _run_cistarget_dem(dataset, prefix, outdir, cell_type, binarised_topics_pr, 
     # default arguments are copied from pycistarget package default
 
     import dill
-    import pyranges as pr
     topics_outfile = f'{outdir}/{prefix}.cistopic.k_{len(binarised_topics_pr)}.cistarget_dem.pkl'
     dar_outfile = f'{outdir}/{prefix}.cistopic.dar.{cell_type}.cistarget_dem.pkl'
     if os.path.isfile(topics_outfile) and os.path.isfile(dar_outfile) and not force:
@@ -423,7 +488,6 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     log.log(f'Binarised topics using top {top} peaks are saved to {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', calling_file = 'run_cistopic')
 
     # convert the binarized topics to a dict of pyRanges objects
-    import pyranges as pr
     binarised_topics_pr_unfiltered = {topic: pr.PyRanges(
         chromosomes = peaks.index.str.split(':|-').str[0],
         starts = peaks.index.str.split(':|-').str[1].astype(int),
@@ -573,10 +637,10 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt') or force):
         W = pd.read_table(f'{outdir}/{prefix}.scopen.k_{kl.knee}.weights.txt', index_col = 0)
         top_peaks = {f'F{i}': W[f'F{i}'].sort_values(ascending = False).head(top) for i in range(1, kl.knee + 1)}
-        top_peaks_df = {topic: pd.DataFrame(dict(
+        top_peaks_df = {topic: pr.PyRanges(
             chromosomes = peaks.index.str.split(':|-').str[0],
             starts = peaks.index.str.split(':|-').str[1].astype(int),
-            ends = peaks.index.str.split(':|-').str[2].astype(int)))
+            ends = peaks.index.str.split(':|-').str[2].astype(int))
             for topic, peaks in top_peaks.items()}
         greatpy_results = greatpy_enrichment_batch(top_peaks_df, species = 'hg38')
         greatpy_results.to_csv(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt', sep = '\t', index = False)
