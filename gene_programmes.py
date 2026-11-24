@@ -512,9 +512,9 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     usages = pd.read_table(cnmf_obj.paths['consensus_usages__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     loadings = pd.read_table(cnmf_obj.paths['consensus_spectra__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     spectra_tpm = pd.read_table(cnmf_obj.paths['gene_spectra_tpm__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
-    # spectra_score = pd.read_table(cnmf_obj.paths['gene_spectra_score__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
+    spectra_score = pd.read_table(cnmf_obj.paths['gene_spectra_score__txt'].replace(r'%d', str(k_optim)).replace(r'%s', density_threshold_str), index_col = 0)
     adata = sc.read_h5ad(h5ad_raw, 'r')
-    cnmf_downstream(usages, spectra_tpm, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir)
+    cnmf_downstream(usages, spectra_score, adata, cell_type, outdir, prefix, k_optim, embedding, time_key, force, savedir)
 
     # export cNMF results in MAGMA format
     if savedir is not None:
@@ -526,7 +526,13 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
         spectra_tpm.index.name = 'gene'
         spectra_tpm.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}.spectra_tpm' for i in range(spectra_tpm.shape[1])]
         spectra_tpm.to_csv(f'{save_prefix}.spectra_tpm.txt', sep = '\t', index = True, header = True)
-        log.log(f'Formatted cNMF loadings for MAGMA GSEA analysis saved to {save_prefix}.txt and {save_prefix}.spectra_tpm.txt', calling_file = 'run_cnmf')
+        spectra_score.index.name = 'gene'
+        spectra_score.columns = [f'{prefix}.cnmf_k{k_optim}.F{i+1}.spectra_score' for i in range(spectra_score.shape[1])]
+        spectra_score.to_csv(f'{save_prefix}.spectra_score.txt', sep = '\t', index = True, header = True)
+        log.log(f'Formatted cNMF loadings for MAGMA GSEA analysis saved to:', calling_file = 'run_cnmf')
+        log.log(f'    {save_prefix}.txt', calling_file = 'run_cnmf')
+        log.log(f'    {save_prefix}.spectra_tpm.txt', calling_file = 'run_cnmf')
+        log.log(f'    {save_prefix}.spectra_score.txt', calling_file = 'run_cnmf')
 
     # enforce projection using available loadings from projection_dataset/projection_prefix
     if len(projection) > 0:
