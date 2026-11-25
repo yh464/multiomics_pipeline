@@ -50,7 +50,7 @@ def _load_go_df():
                 name = re.sub(r'\s*\(GO:\d+\)', '', name)
             else: _id = f'{dataset}:{name}'
             genes = line[1:]
-            out_df.append(pd.DataFrame({'id': _id, 'name': name, 'symbol': genes}))
+            out_df.append(pd.DataFrame({'database': dataset, 'id': _id, 'name': name, 'symbol': genes}))
     
     go_df = pd.concat(out_df, ignore_index = True)
     go_df = go_df.drop_duplicates().dropna()
@@ -87,7 +87,7 @@ def _greatpy_enrichment_single_set(args):
         log.warn(f'Input test set {name} does not overlap with any regulatory domains of the genome')
         return pd.DataFrame(
             index = [],
-            columns = ['set_name', 'n_peaks', 'id', 'go_term', 'binom_p_value', 'binom_fold_enrichment',
+            columns = ['database', 'set_name', 'n_peaks', 'id', 'go_term', 'binom_p_value', 'binom_fold_enrichment',
                 'hypergeom_p_value', 'hypergeom_fold_enrichment', 'intersection_size', 'recall'],
             dtype = object
         )
@@ -110,6 +110,7 @@ def _greatpy_enrichment_single_set(args):
     # using the same definition of peak - regulatory domain overlap throughout this script
     go_to_genes = ann.groupby('id')['symbol'].apply(set).to_dict()
     go_to_terms = ann.groupby('id')['name'].first().to_dict()
+    go_to_db = ann.groupby('id')['database'].first().to_dict()
     go_to_peaks = {go_id: set().union(*[gene_to_peaks.get(gene, set()) for gene in genes]) for go_id, genes in go_to_genes.items()}
 
     # quantities for global use
@@ -128,7 +129,7 @@ def _greatpy_enrichment_single_set(args):
         nb_binom = current_regdom_df['length'].sum() # total number of bases in the regulatory domains associated with the GO term
 
         out.append(pd.DataFrame(dict(
-            set_name = [name], n_peaks = n_binom, id = go_id, go_term = go_term,
+            database = [go_to_db[go_id]], set_name = [name], n_peaks = n_binom, id = go_id, go_term = go_term,
             binom_p_value = binom.sf(k_binom - 1, n_binom, nb_binom / total_nu), # survival function = 1 - cdf
             binom_fold_enrichment = (k_binom * total_nu) / nb_binom if nb_binom > 0 else 2**63-1,
             hypergeom_p_value = hypergeom.sf(k_hypergeom - 1, n_genome, K_hypergeom, len(overlap_genes)), # survival function = 1 - cdf
@@ -137,7 +138,7 @@ def _greatpy_enrichment_single_set(args):
         )))
 
     out = pd.concat(out, ignore_index = True)
-    out = out.sort_values(['binom_p_value', 'hypergeom_p_value']).reset_index(drop = True)
+    out = out.loc[(out.binom_p_value < 0.05) | (out.hypergeom_p_value < 0.05)].sort_values(['binom_p_value', 'hypergeom_p_value']).reset_index(drop = True)
     # out = great.tl.enrichment(peak_df, regdom_file = regdom_df, chr_size_file = size_df, annotation_file = go_df)
     return out
 
