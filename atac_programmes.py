@@ -8,7 +8,7 @@ Python pipelines to identify gene programmes from scATAC-seq data
 '''
 
 # scanpy takes long to import so needs to be imported in each sub-function
-import os, time, pickle, glob, re
+import os, time, pickle, glob, re, gc
 from multiprocessing import Pool
 import numpy as np
 import pandas as pd
@@ -326,14 +326,14 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
         log.log(f'Identifying differentially accessible regions for {dataset}/{prefix}', calling_file = 'run_cistopic')
         # this step is memory intensive, need to subset cells if the dataset is large
-        free_bytes = mem * 1014**2 * 0.4 # use 40% of the available memory per matrix
+        free_bytes = mem * 1024**2 * 0.4 # use 40% of the available memory per matrix
         n_cells = int(free_bytes / (adata.shape[1] * 4)) # 4 bytes per float32
         if adata.shape[0] > n_cells:
             selected_cells = downsample_adata(adata, downsample = int(n_cells/len(cell_type[0])) if cell_type else n_cells, 
                 group_by = cell_type[0], seed = seed, index_only = True).tolist()
             log.log(f'Subsetting to {len(selected_cells)} cells for HVP identification which uses dense matrices', calling_file = 'run_cistopic')
         else: selected_cells = None
-        imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
+        imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = selected_cells, selected_regions = None, scale_factor = 1e6)
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
         hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
             n_bins = 20, n_top_features = None, plot = False)
