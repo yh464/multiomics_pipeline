@@ -12,7 +12,6 @@ import os, time, pickle, glob, re
 from multiprocessing import Pool
 import numpy as np
 import pandas as pd
-import pyranges as pr
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 # import matplotlib as mpl
@@ -60,6 +59,7 @@ def _load_go_df():
 
 def _greatpy_enrichment_single_set(args):
     from scipy.stats import binom, hypergeom
+    import pyranges as pr
 
     name, peak_df, regdom_df, size_df, go_df = args
     go_df = go_df.drop_duplicates().dropna()
@@ -501,6 +501,7 @@ def run_cistopic(dataset, prefix, outdir, n_components = range(25, 501, 25),
     log.log(f'Binarised topics using top {top} peaks are saved to {outdir}/{prefix}.cistopic.k_{k_optim}.binarised_topics.top{top}.pkl', calling_file = 'run_cistopic')
 
     # convert the binarized topics to a dict of pyRanges objects
+    import pyranges as pr
     binarised_topics_pr_unfiltered = {topic: pr.PyRanges(
         chromosomes = peaks.index.str.split(':|-').str[0],
         starts = peaks.index.str.split(':|-').str[1].astype(int),
@@ -647,6 +648,7 @@ def run_scopen(dataset, prefix, outdir, n_components = range(25, 501, 25), n_pea
     log.log(f'Automatically selecting {kl.knee} components for {dataset}/{prefix} based on knee point of reconstruction error', calling_file = 'run_scopen')
 
     # extract top 3000 peaks per factor and run greatpy
+    import pyranges as pr
     if top > 0 and (not os.path.isfile(f'{outdir}/{prefix}.scopen.k_{kl.knee}.top{top}.greatpy.txt') or force):
         W = pd.read_table(f'{outdir}/{prefix}.scopen.k_{kl.knee}.weights.txt', index_col = 0)
         top_peaks = {f'F{i}': W[f'F{i}'].sort_values(ascending = False).head(top) for i in range(1, kl.knee + 1)}
