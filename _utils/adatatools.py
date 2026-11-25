@@ -240,7 +240,7 @@ def subset_h5ad(h5ad_in, h5ad_out, gene_subset):
     adata.file.close()
 
 # functions for in-memory anndata operations
-def downsample_adata(adata, downsample = -1, group_by = None, seed = 19260817):
+def downsample_adata(adata, downsample = -1, group_by = None, index_only = False, seed = 19260817):
     import scanpy as sc
     # if downsample is -1, downsample so that the total number of cells is around 100000
     # no downsampling if fewer than 150000 cells
@@ -256,6 +256,7 @@ def downsample_adata(adata, downsample = -1, group_by = None, seed = 19260817):
     elif downsample > 0:
         selected_cells = adata.obs.sample(n = min(downsample, adata.shape[0]), replace = False, random_state = seed)
     else: selected_cells = adata.obs
+    if index_only: return selected_cells.index
     adata = adata[selected_cells.index, :].to_memory()
     sc.pp.filter_genes(adata, min_cells = 1) # remove genes with zero counts
     sc.pp.filter_cells(adata, min_genes = 1) # remove cells with zero counts
