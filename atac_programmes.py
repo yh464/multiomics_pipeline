@@ -326,11 +326,10 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         from pycisTopic.diff_features import impute_accessibility, normalize_scores, find_highly_variable_features, find_diff_features
         log.log(f'Identifying differentially accessible regions for {dataset}/{prefix}', calling_file = 'run_cistopic')
         # this step is memory intensive, need to subset cells if the dataset is large
-        # free_bytes = mem * 1024**2 * 0.1 # use 10% of the available memory per matrix
-        # n_cells = int(free_bytes / (adata.shape[1] * 4)) # 4 bytes per float32
-        n_cells = 50000
+        free_bytes = mem * 1024**2 * 0.1 # use 10% of the available memory per matrix
+        n_cells = int(free_bytes / (adata.shape[1] * 4)) # 4 bytes per float32
         if adata.shape[0] > n_cells:
-            selected_cells = downsample_adata(adata, downsample = int(n_cells/len(cell_type[0])) if cell_type else n_cells, 
+            selected_cells = downsample_adata(adata, downsample = int(n_cells/len(cell_type)) if cell_type else n_cells, 
                 group_by = cell_type[0] if cell_type else None, seed = seed, index_only = True) + '___cisTopic'
             selected_cells = selected_cells.tolist()
             log.log(f'Subsetting to {len(selected_cells)} cells for HVP identification which uses dense matrices', calling_file = 'run_cistopic')
