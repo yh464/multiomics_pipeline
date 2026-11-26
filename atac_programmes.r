@@ -58,7 +58,7 @@ downsample_adata = function(adata, downsample, cell_type = NULL, seed = 19260817
         selected_cells = adata$obs
     }
 
-    adata = adata[selected_cells$index, ] %>% as_InMemoryAnnData() # read HDF5AnnData into memory
+    adata = adata[selected_cells$index, ]$as_InMemoryAnnData() # read HDF5AnnData into memory
     adata = adata[, Matrix::rowSums(adata$X) > 0]
     adata = adata[Matrix::colSums(adata$X) > 0, ]
     return(adata)
