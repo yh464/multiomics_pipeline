@@ -42,16 +42,16 @@ downsample_adata = function(adata, downsample, cell_type = NULL, seed = 19260817
     }
 
     if (downsample > 0 & !is.null(cell_type)) {
-        message('Number of cells per cell type:')
+        print('Number of cells per cell type:')
         selected_cells = adata$obs %>% group_by(.data[[cell_type]]) %>% group_modify(~ {
             n_cells = nrow(.x)
-            message('  ', unique(.x[[cell_type]]), ': ', n_cells)
+            print('  ', unique(.x[[cell_type]]), ': ', n_cells)
             n_sample = min(downsample, n_cells)
             .x[sample(n_cells, n_sample, replace = FALSE), ]
         }) %>% ungroup()
     } else if (downsample > 0) {
         n_cells = nrow(adata$obs)
-        message('Total number of cells: ', n_cells)
+        print('Total number of cells: ', n_cells)
         n_sample = min(downsample, n_cells)
         selected_cells = adata$obs[sample(n_cells, n_sample, replace = FALSE), ]
     } else {
@@ -59,8 +59,7 @@ downsample_adata = function(adata, downsample, cell_type = NULL, seed = 19260817
     }
 
     adata = adata[selected_cells$index, ]$as_InMemoryAnnData() # read HDF5AnnData into memory
-    adata = adata[, Matrix::rowSums(adata$X) > 0]
-    adata = adata[Matrix::colSums(adata$X) > 0, ]
+    adata = adata[Matrix::rowSums(adata$X) > 0, Matrix::colSums(adata$X) > 0] # remove empty peaks and cells
     return(adata)
 }
 
