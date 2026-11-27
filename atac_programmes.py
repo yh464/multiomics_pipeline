@@ -329,7 +329,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         free_bytes = mem * 1024**2 * 0.2 # use 20% of the available memory per matrix
         n_cells = int(free_bytes / (adata.shape[1] * 4)) # 4 bytes per float32
         if adata.shape[0] > n_cells:
-            selected_cells = downsample_adata(adata, downsample = int(n_cells/len(cell_type)) if cell_type else n_cells, 
+            selected_cells = downsample_adata(adata, downsample = int(n_cells/adata.obs[cell_type[0]].nunique()) if cell_type else n_cells, 
                 group_by = cell_type[0] if cell_type else None, seed = seed, index_only = True) + '___cisTopic'
             selected_cells = selected_cells.tolist()
             log.log(f'Subsetting to {len(selected_cells)} cells for HVP identification which uses dense matrices', calling_file = 'run_cistopic')
