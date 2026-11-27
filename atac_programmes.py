@@ -339,17 +339,15 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
         hvp = find_highly_variable_features(norm_imputed_obj, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, 
             n_bins = 20, n_top_features = None, plot = False)
-        del norm_imputed_obj; gc.collect()
-        # re-impute using all cells for DAR identification
-        if selected_cells is not None:
-            del imputed_acc_obj; gc.collect()
-            imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = None, scale_factor = 1e6)
+        del norm_imputed_obj, imputed_acc_obj; gc.collect()
+        # re-impute using just HVPs to save memory
+        imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = None, selected_regions = hvp, scale_factor = 1e6)
         log.log(f'Found {len(hvp)} highly variable peaks for {dataset}/{prefix}', calling_file = 'run_cistopic')
         for ct in tqdm(cell_type, desc = f'Identifying DARs for {dataset}/{prefix}'):
             if os.path.isfile(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl') and not force: continue
             log.log(f'Identifying DARs for {ct} in {dataset}/{prefix}', calling_file = 'run_cistopic')
             os.environ['RAY_memory_usage_threshold'] = '0.99'
-            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, var_features = hvp, 
+            markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, # the imputed_acc_obj only contains HVPs, no need to specify var_features
                 variable = ct, n_cpu = max(int(n_cpu/4), 1), split_pattern = '-',
                 _temp_dir = '/rds/user/yh464/hpc-work/temp/ray') # must use a short path name as ray has a limit of 107 bytes for the tmpdir
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
