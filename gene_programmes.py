@@ -384,7 +384,7 @@ def run_cnmf(dataset, prefix, outdir, n_components = range(5, 41, 1), density_th
     else: time.sleep(15) # this step is fast enough, no time limit needed 
 
     # run NMF iterations
-    if not check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter, update = False)[0] or force:
+    if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter, update = False)[0] or force:
         cnmf_obj.factorize(worker_i = worker_id, total_workers = 100, skip_completed_runs = (not force))
     log.log(f'Worker {worker_id} completed NMF iterations', calling_file = 'run_cnmf')
     if check_cnmf_incomplete(dataset, prefix, n_components = n_components, n_iter = n_iter, update = False)[0]:
