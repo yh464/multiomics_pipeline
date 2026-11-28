@@ -333,7 +333,8 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
                 group_by = cell_type[0] if cell_type else None, seed = seed, index_only = True) + '___cisTopic'
             selected_cells = selected_cells.tolist()
             log.log(f'Subsetting to {len(selected_cells)} cells for HVP identification which uses dense matrices', calling_file = 'run_cistopic')
-        else: selected_cells = None
+            memory_constraint = True
+        else: selected_cells = None; memory_constraint = False
         imputed_acc_obj = impute_accessibility(cistopic_obj, selected_cells = selected_cells, selected_regions = None, scale_factor = 1e6)
         gc.collect()
         norm_imputed_obj = normalize_scores(imputed_acc_obj, scale_factor = 1e6)
@@ -348,7 +349,7 @@ def _generate_cistopic_bin_topics(dataset, prefix, outdir, n_components = range(
             log.log(f'Identifying DARs for {ct} in {dataset}/{prefix}', calling_file = 'run_cistopic')
             os.environ['RAY_memory_usage_threshold'] = '0.99'
             markers_dict = find_diff_features(cistopic_obj, imputed_acc_obj, # the imputed_acc_obj only contains HVPs, no need to specify var_features
-                variable = ct, n_cpu = max(int(n_cpu/4), 1), split_pattern = '-',
+                variable = ct, n_cpu = max(int(n_cpu/4), 1) if not memory_constraint else 1, split_pattern = '-', # Ray will spill objects near memory limit
                 _temp_dir = '/rds/user/yh464/hpc-work/temp/ray') # must use a short path name as ray has a limit of 107 bytes for the tmpdir
             with open(f'{outdir}/{prefix}.cistopic.dar.{ct}.pkl', 'wb') as f: pickle.dump(markers_dict, f)
     dar = pickle.load(open(f'{outdir}/{prefix}.cistopic.dar.{cell_type[0]}.pkl', 'rb'))
